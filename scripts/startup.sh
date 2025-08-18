@@ -129,15 +129,35 @@ check_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
     
-    # If health marker exists and force sync is not enabled, trust previous successful boot
+    # If health marker exists and force sync is not enabled, do quick check but trust previous success
     if [[ -f "$HEALTH_MARKER_FILE" && "$FORCE_MODEL_SYNC" != "true" ]]; then
-        log "INFO" "  • Health marker found - previous boot successful"
-        log "INFO" "  • Use FORCE_MODEL_SYNC=true to override and re-check models"
-        echo "false false"
-        return
+        log "INFO" "  • Health marker found - doing quick model count verification"
+        # Quick count check - if models exist, trust health marker
+        local total_files=$(find "$COMFYUI_ROOT/models" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | wc -l)
+        if (( total_files > 0 )); then
+            log "INFO" "  • Found $total_files model files - trusting previous successful boot"
+            log "INFO" "  • Use FORCE_MODEL_SYNC=true to override and re-download"
+            echo "false false"
+            return
+        else
+            log "INFO" "  • No model files found despite health marker - will re-download"
+        fi
     fi
     
-    log "INFO" "  • Performing model availability check..."
+    log "INFO" "  • Performing detailed model availability check..."
+    
+    # Debug: Show where we're looking and what's actually there
+    log "INFO" "  • Searching in: $COMFYUI_ROOT/models/"
+    local all_files=$(find "$COMFYUI_ROOT/models" -type f 2>/dev/null | wc -l)
+    log "INFO" "  • Total files in models directory: $all_files"
+    
+    # List some files if they exist
+    if (( all_files > 0 )); then
+        log "INFO" "  • Sample files found:"
+        find "$COMFYUI_ROOT/models" -type f 2>/dev/null | head -3 | while read file; do
+            log "INFO" "    → $file"
+        done
+    fi
     
     # Quick check for existing models to avoid redundant downloads
     if [[ -n "$CIVITAI_MODELS" ]]; then
@@ -148,6 +168,8 @@ check_downloads_needed() {
         
         local total_models=$((checkpoint_count + lora_count + vae_count))
         local civitai_model_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
+        
+        log "INFO" "  • checkpoints: $checkpoint_count, loras: $lora_count, vae: $vae_count"
         
         if (( total_models < civitai_model_count )); then
             civitai_needed=true
@@ -272,13 +294,13 @@ start_filebrowser() {
         log "INFO" "  • Admin user created with password: $fb_password"
     fi
     
-    # Start filebrowser in background
+    # Start filebrowser in background (using Hearmeman's approach)
     filebrowser \
-        --root "$WORKSPACE_ROOT" \
-        --port "$FILEBROWSER_PORT" \
-        --address "0.0.0.0" \
-        --database "$db_path" \
-        --log "$config_dir/filebrowser.log" &
+        -d "$db_path" \
+        -r "$WORKSPACE_ROOT" \
+        -a "0.0.0.0" \
+        -p "$FILEBROWSER_PORT" \
+        > "$config_dir/filebrowser.log" 2>&1 &
     
     local fb_pid=$!
     
