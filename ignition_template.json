@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI SUCCESS v1.0",
+  "name": "Ignition ComfyUI Simplified v1.0",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsg00d/ignition-comfyui:v1.0.2",
+  "dockerImage": "heapsg00d/ignition-comfyui:latest",
   "ports": [
     {
       "privatePort": 8188,
@@ -45,12 +45,12 @@
     },
     {
       "key": "PERSISTENT_STORAGE",
-      "value": "/workspace/persistent_models",
+      "value": "",
       "description": "Persistent storage path or 'none'"
     },
     {
       "key": "FILEBROWSER_PASSWORD",
-      "value": "success_2024",
+      "value": "simplified_2024",
       "description": "Password for file browser access"
     },
     {

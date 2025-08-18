@@ -66,6 +66,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         opencv-python \
         psutil
 
+FROM base AS final
+
+# Final stage optimizations
+RUN python -m pip install opencv-python
+
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet}
 
@@ -76,12 +81,14 @@ RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh |
 COPY scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
 
-# Set environment defaults
+# Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""
 ENV HUGGINGFACE_MODELS=""
 ENV CIVITAI_TOKEN=""
-ENV PERSISTENT_STORAGE="none"
+ENV HF_TOKEN=""
 ENV FILEBROWSER_PASSWORD="runpod"
+ENV COMFYUI_PORT="8188"
+ENV FILEBROWSER_PORT="8080"
 
 # Expose ports
 EXPOSE 8188 8080

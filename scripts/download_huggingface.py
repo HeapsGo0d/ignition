@@ -82,8 +82,7 @@ class HuggingFaceDownloader:
         
         return True
 
-    def download_single_file(self, repo_id: str, filename: str, 
-                           persistent_storage: str = "none") -> bool:
+    def download_single_file(self, repo_id: str, filename: str) -> bool:
         """Download a single file from HuggingFace repository."""
         try:
             logger.info(f"Processing file: {filename} from {repo_id}")
@@ -92,11 +91,10 @@ class HuggingFaceDownloader:
             model_type = self.determine_model_type(repo_id, filename)
             destination_path = file_handler.get_destination_path(filename, model_type)
             
-            # Check if file already exists and is valid (for persistent storage)
-            if persistent_storage != "none":
-                if destination_path.exists():
-                    logger.info(f"File already exists: {filename}")
-                    return True
+            # Check if file already exists and is valid (RunPod volume persistence)
+            if destination_path.exists():
+                logger.info(f"File already exists: {filename}")
+                return True
             
             # Create temporary path
             temp_path = file_handler.get_temp_path(filename)
@@ -199,7 +197,7 @@ class HuggingFaceDownloader:
             logger.error(f"Error accessing repository {repo_id}: {e}")
             return []
 
-    async def download_repository(self, repo_id: str, persistent_storage: str = "none") -> Tuple[int, int]:
+    async def download_repository(self, repo_id: str) -> Tuple[int, int]:
         """Download all relevant files from a HuggingFace repository."""
         try:
             # Get list of files to download
@@ -215,7 +213,7 @@ class HuggingFaceDownloader:
             loop = asyncio.get_event_loop()
             
             def download_file_sync(file_info):
-                return self.download_single_file(repo_id, file_info['filename'], persistent_storage)
+                return self.download_single_file(repo_id, file_info['filename'])
             
             # Limit concurrent downloads
             semaphore = asyncio.Semaphore(self.concurrent_downloads)
@@ -243,7 +241,7 @@ class HuggingFaceDownloader:
             logger.error(f"Error downloading repository {repo_id}: {e}")
             return 0, 1
 
-    async def download_models(self, repo_ids: List[str], persistent_storage: str = "none") -> Tuple[int, int]:
+    async def download_models(self, repo_ids: List[str]) -> Tuple[int, int]:
         """Download models from multiple HuggingFace repositories."""
         if not repo_ids:
             logger.info("No HuggingFace models to download")
@@ -260,7 +258,7 @@ class HuggingFaceDownloader:
             if not repo_id:
                 continue
                 
-            successful, failed = await self.download_repository(repo_id, persistent_storage)
+            successful, failed = await self.download_repository(repo_id)
             total_successful += successful
             total_failed += failed
         
@@ -275,8 +273,6 @@ async def main():
     parser = argparse.ArgumentParser(description='Download models from HuggingFace')
     parser.add_argument('--repos', required=True, help='Comma-separated list of repository IDs')
     parser.add_argument('--token', help='HuggingFace API token')
-    parser.add_argument('--persistent-storage', default='none', help='Persistent storage path or "none"')
-    
     args = parser.parse_args()
     
     repo_ids = [repo.strip() for repo in args.repos.split(',') if repo.strip()]
@@ -286,7 +282,7 @@ async def main():
         return 1
     
     downloader = HuggingFaceDownloader(args.token)
-    successful, failed = await downloader.download_models(repo_ids, args.persistent_storage)
+    successful, failed = await downloader.download_models(repo_ids)
     
     if failed > 0:
         logger.error(f"Some downloads failed: {failed} files")

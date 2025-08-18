@@ -143,7 +143,7 @@ class CivitAIDownloader:
             logger.error(f"Error downloading {filename}: {e}")
             return False
 
-    async def process_model(self, version_id: str, persistent_storage: str = "none") -> bool:
+    async def process_model(self, version_id: str) -> bool:
         """Process a single model download."""
         try:
             # Get model information
@@ -170,11 +170,10 @@ class CivitAIDownloader:
             model_type = self.determine_model_type(model_info)
             destination_path = file_handler.get_destination_path(filename, model_type)
             
-            # Check if file already exists and is valid (for persistent storage)
-            if persistent_storage != "none":
-                if file_handler.file_exists_and_valid(destination_path, file_size):
-                    logger.info(f"File already exists and is valid: {filename}")
-                    return True
+            # Check if file already exists and is valid (RunPod volume persistence)
+            if destination_path.exists() and file_handler.file_exists_and_valid(destination_path, file_size):
+                logger.info(f"File already exists and is valid: {filename}")
+                return True
             
             # Download to temporary location
             temp_path = file_handler.get_temp_path(filename)
@@ -198,7 +197,7 @@ class CivitAIDownloader:
             logger.error(f"Error processing model {version_id}: {e}")
             return False
 
-    async def download_models(self, model_ids: List[str], persistent_storage: str = "none") -> Tuple[int, int]:
+    async def download_models(self, model_ids: List[str]) -> Tuple[int, int]:
         """Download multiple models with controlled concurrency."""
         if not model_ids:
             logger.info("No CivitAI models to download")
@@ -211,7 +210,7 @@ class CivitAIDownloader:
         
         async def download_with_semaphore(version_id: str) -> bool:
             async with semaphore:
-                return await self.process_model(version_id, persistent_storage)
+                return await self.process_model(version_id)
         
         # Execute downloads with limited concurrency
         results = await asyncio.gather(
@@ -234,8 +233,6 @@ async def main():
     parser = argparse.ArgumentParser(description='Download models from CivitAI')
     parser.add_argument('--models', required=True, help='Comma-separated list of model version IDs')
     parser.add_argument('--token', help='CivitAI API token')
-    parser.add_argument('--persistent-storage', default='none', help='Persistent storage path or "none"')
-    
     args = parser.parse_args()
     
     model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
@@ -245,7 +242,7 @@ async def main():
         return 1
     
     async with CivitAIDownloader(args.token) as downloader:
-        successful, failed = await downloader.download_models(model_ids, args.persistent_storage)
+        successful, failed = await downloader.download_models(model_ids)
         
         if failed > 0:
             logger.error(f"Some downloads failed: {failed} out of {len(model_ids)}")
