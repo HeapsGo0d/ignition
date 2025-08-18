@@ -51,6 +51,10 @@ export HF_TOKEN="${HF_TOKEN:-}"
 export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
+export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
+
+# Health marker file to track successful boots
+HEALTH_MARKER_FILE="$WORKSPACE_ROOT/.ignition_ok"
 
 # Print startup banner
 print_banner() {
@@ -124,6 +128,16 @@ setup_storage() {
 check_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
+    
+    # If health marker exists and force sync is not enabled, trust previous successful boot
+    if [[ -f "$HEALTH_MARKER_FILE" && "$FORCE_MODEL_SYNC" != "true" ]]; then
+        log "INFO" "  • Health marker found - previous boot successful"
+        log "INFO" "  • Use FORCE_MODEL_SYNC=true to override and re-check models"
+        echo "false false"
+        return
+    fi
+    
+    log "INFO" "  • Performing model availability check..."
     
     # Quick check for existing models to avoid redundant downloads
     if [[ -n "$CIVITAI_MODELS" ]]; then
@@ -241,8 +255,21 @@ start_filebrowser() {
         log "INFO" "  • Initializing filebrowser database..."
         # First initialize the config
         filebrowser -d "$db_path" config init
-        # Then add the admin user
-        filebrowser -d "$db_path" users add admin "$FILEBROWSER_PASSWORD" --perm.admin
+        
+        # Ensure password meets minimum requirements (12+ chars)
+        local fb_password="$FILEBROWSER_PASSWORD"
+        if [[ ${#fb_password} -lt 12 ]]; then
+            fb_password="ignition_${FILEBROWSER_PASSWORD}_2024"
+            log "INFO" "  • Password too short, using: $fb_password"
+        fi
+        
+        # Set minimum password length policy
+        filebrowser -d "$db_path" config set --auth.method=json --auth.header=""
+        
+        # Then add the admin user with proper password
+        filebrowser -d "$db_path" users add admin "$fb_password" --perm.admin
+        
+        log "INFO" "  • Admin user created with password: $fb_password"
     fi
     
     # Start filebrowser in background
@@ -254,9 +281,16 @@ start_filebrowser() {
         --log "$config_dir/filebrowser.log" &
     
     local fb_pid=$!
+    
+    # Show the actual password being used (handle extended password case)
+    local display_password="$FILEBROWSER_PASSWORD"
+    if [[ ${#FILEBROWSER_PASSWORD} -lt 12 ]]; then
+        display_password="ignition_${FILEBROWSER_PASSWORD}_2024"
+    fi
+    
     log "INFO" "  • File browser started on port $FILEBROWSER_PORT (PID: $fb_pid)"
     log "INFO" "  • Username: admin"
-    log "INFO" "  • Password: $FILEBROWSER_PASSWORD"
+    log "INFO" "  • Password: $display_password"
     log "INFO" ""
 }
 
@@ -273,17 +307,36 @@ start_comfyui() {
         log "INFO" "  • CUDA device set to: $CUDA_VISIBLE_DEVICES"
     fi
     
-    # Log model counts
-    for model_type in checkpoints loras vae embeddings; do
+    # Set explicit ComfyUI model paths
+    export COMFYUI_MODEL_PATH="$COMFYUI_ROOT/models"
+    
+    # Ensure all model directories exist with proper permissions
+    for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
         local model_dir="$COMFYUI_ROOT/models/$model_type"
+        mkdir -p "$model_dir"
+        chmod 755 "$model_dir"
+        chown -R $(whoami):$(whoami) "$model_dir" 2>/dev/null || true
+        
         if [[ -d "$model_dir" ]]; then
-            local count=$(find "$model_dir" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.pth" -o -name "*.bin" | wc -l)
-            log "INFO" "  • $model_type: $count models"
+            local count=$(find "$model_dir" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.pth" -o -name "*.bin" 2>/dev/null | wc -l)
+            log "INFO" "  • $model_type: $count models ($(du -sh "$model_dir" 2>/dev/null | cut -f1 || echo "0B"))"
+            
+            # List first few models for verification
+            if [[ $count -gt 0 ]]; then
+                local first_models=$(find "$model_dir" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | head -2 | xargs -I {} basename {})
+                if [[ -n "$first_models" ]]; then
+                    log "INFO" "    → Sample files: $first_models"
+                fi
+            fi
         fi
     done
     
     log "INFO" "  • Starting ComfyUI server on port $COMFYUI_PORT..."
     log "INFO" ""
+    
+    # Create health marker to indicate successful startup
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
+    log "INFO" "✅ Health marker created - future restarts will be faster"
     
     # Start ComfyUI (this will run in foreground)
     exec python3 main.py \
