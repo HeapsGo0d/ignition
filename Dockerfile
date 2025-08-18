@@ -39,18 +39,20 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Set working directory
 WORKDIR /workspace
 
-# Install PyTorch with CUDA 12.1 support (stable)
+# Install PyTorch first
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu121
+    pip install torch torchvision torchaudio
 
-# Core Python tooling
+# Core Python tooling  
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Install ComfyUI using comfy-cli
+# Runtime libraries including comfy-cli
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install comfy-cli && \
+    pip install pyyaml gdown triton comfy-cli
+
+# Install ComfyUI using comfy-cli  
+RUN --mount=type=cache,target=/root/.cache/pip \
     /usr/bin/yes | comfy --workspace /workspace install
 
 # Install additional dependencies for Ignition
