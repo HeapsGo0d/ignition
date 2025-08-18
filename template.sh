@@ -358,8 +358,8 @@ deploy_template() {
 {
   "name": "$TEMPLATE_NAME",
   "imageName": "$DOCKER_IMAGE",
-  "containerDiskInGb": 50,
-  "volumeInGb": 50,
+  "containerDiskInGb": 200,
+  "volumeInGb": 0,
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
   "ports": "8188/http,8080/http",
