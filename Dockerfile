@@ -39,10 +39,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Set working directory
 WORKDIR /workspace
 
-# Install PyTorch with CUDA 12.8 support
+# Install PyTorch with CUDA 12.1 support (stable)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --pre torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/nightly/cu128
+    pip install torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/cu121
 
 # Core Python tooling
 RUN --mount=type=cache,target=/root/.cache/pip \
