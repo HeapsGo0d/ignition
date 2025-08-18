@@ -124,17 +124,11 @@ get_configuration() {
     read -p "HuggingFace repositories: " HUGGINGFACE_MODELS
     echo ""
     
-    # Persistent Storage
-    echo -e "${BLUE}Persistent Storage:${NC}"
-    echo "Enable persistent storage for models? (saves download time on restarts)"
-    read -p "Use persistent storage? (y/n) [y]: " use_persistent
-    use_persistent=${use_persistent:-y}
-    
-    if [[ "$use_persistent" == "y" || "$use_persistent" == "Y" ]]; then
-        PERSISTENT_STORAGE="/workspace/persistent_models"
-    else
-        PERSISTENT_STORAGE="none"
-    fi
+    # Note: Persistent storage handled by RunPod volume settings
+    echo -e "${BLUE}Storage Note:${NC}"
+    echo "Persistence handled by RunPod volume settings:"
+    echo "  • Volume 0GB = Ephemeral (models download each time)"  
+    echo "  • Volume >0GB = Persistent (models survive restarts)"
     echo ""
     
     # File Browser Password
@@ -359,28 +353,23 @@ deploy_template() {
         return 1
     fi
     
-    # Create simplified API payload (RunPod API format)
+    # Create API payload using catalyst's proven format
     local api_payload=$(cat << EOF
 {
   "name": "$TEMPLATE_NAME",
-  "description": "$TEMPLATE_DESCRIPTION", 
-  "dockerImage": "$DOCKER_IMAGE",
+  "imageName": "$DOCKER_IMAGE",
   "containerDiskInGb": 50,
+  "volumeInGb": 50,
+  "volumeMountPath": "/workspace",
   "dockerArgs": "",
-  "ports": [
-    {"privatePort": 8188, "publicPort": 8188, "type": "http"},
-    {"privatePort": 8080, "publicPort": 8080, "type": "http"}
-  ],
+  "ports": "8188/http,8080/http",
+  "readme": "# $TEMPLATE_NAME\n\n$TEMPLATE_DESCRIPTION\n\n## Configuration\n- CivitAI Models: $CIVITAI_MODELS\n- HuggingFace Models: $HUGGINGFACE_MODELS\n- Storage: Set volume size in RunPod (0GB=ephemeral, >0GB=persistent)",
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": ""},
     {"key": "HF_TOKEN", "value": ""},
-    {"key": "PERSISTENT_STORAGE", "value": "$PERSISTENT_STORAGE"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
-  ],
-  "volumeMounts": [
-    {"containerPath": "/workspace", "name": "workspace"}
   ]
 }
 EOF
@@ -388,14 +377,14 @@ EOF
     
     echo -e "${BLUE}Sending request to RunPod API...${NC}"
     
-    # Make API call to create template
+    # Make API call using catalyst's proven GraphQL format
     local response=$(curl -s -X POST \
         "https://api.runpod.io/graphql" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $RUNPOD_API_KEY" \
         -d "$(cat << EOF
 {
-  "query": "mutation(\$input: SaveTemplateInput!) { saveTemplate(input: \$input) { id name } }",
+  "query": "mutation saveTemplate(\$input: SaveTemplateInput!) { saveTemplate(input: \$input) { id name imageName } }",
   "variables": {
     "input": $api_payload
   }

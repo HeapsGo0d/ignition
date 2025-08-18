@@ -48,7 +48,6 @@ export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
-export PERSISTENT_STORAGE="${PERSISTENT_STORAGE:-none}"
 export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
@@ -68,7 +67,7 @@ print_config() {
     log "INFO" "📋 Configuration:"
     log "INFO" "  • CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
     log "INFO" "  • HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
-    log "INFO" "  • Persistent Storage: $PERSISTENT_STORAGE"
+    log "INFO" "  • Storage: RunPod volume (/workspace)"
     log "INFO" "  • ComfyUI Port: $COMFYUI_PORT"
     log "INFO" "  • File Browser Port: $FILEBROWSER_PORT"
     log "INFO" ""
@@ -106,36 +105,19 @@ check_system() {
     log "INFO" ""
 }
 
-# Setup persistent storage if specified
+# Setup model directories (RunPod volume handles persistence)
 setup_storage() {
-    if [[ "$PERSISTENT_STORAGE" != "none" ]]; then
-        log "INFO" "💾 Setting up persistent storage: $PERSISTENT_STORAGE"
-        
-        # Create persistent storage directories if they don't exist
-        mkdir -p "$PERSISTENT_STORAGE"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models}
-        
-        # Create symlinks to persistent storage
-        for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
-            local_dir="$COMFYUI_ROOT/models/$model_type"
-            persistent_dir="$PERSISTENT_STORAGE/$model_type"
-            
-            # Remove existing directory if it exists
-            if [[ -d "$local_dir" ]] && [[ ! -L "$local_dir" ]]; then
-                log "INFO" "  • Moving existing $model_type to persistent storage"
-                rsync -av "$local_dir/" "$persistent_dir/" 2>/dev/null || true
-                rm -rf "$local_dir"
-            fi
-            
-            # Create symlink
-            if [[ ! -L "$local_dir" ]]; then
-                ln -sf "$persistent_dir" "$local_dir"
-                log "INFO" "  • Linked $model_type to persistent storage"
-            fi
-        done
-        
-        log "INFO" "✅ Persistent storage setup complete"
-        log "INFO" ""
-    fi
+    log "INFO" "💾 Setting up model directories..."
+    
+    # Ensure model directories exist in /workspace/ComfyUI/models/
+    for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
+        model_dir="$COMFYUI_ROOT/models/$model_type"
+        mkdir -p "$model_dir"
+        log "INFO" "  • Created $model_type directory"
+    done
+    
+    log "INFO" "✅ Model directories ready"
+    log "INFO" ""
 }
 
 # Download models function
@@ -152,8 +134,7 @@ download_models() {
         
         python3 "$SCRIPT_DIR/download_civitai.py" \
             --models "$CIVITAI_MODELS" \
-            --token "$CIVITAI_TOKEN" \
-            --persistent-storage "$PERSISTENT_STORAGE" &
+            --token "$CIVITAI_TOKEN" &
         
         civitai_pid=$!
         download_processes+=($civitai_pid)
@@ -167,8 +148,7 @@ download_models() {
         
         python3 "$SCRIPT_DIR/download_huggingface.py" \
             --repos "$HUGGINGFACE_MODELS" \
-            --token "$HF_TOKEN" \
-            --persistent-storage "$PERSISTENT_STORAGE" &
+            --token "$HF_TOKEN" &
         
         hf_pid=$!
         download_processes+=($hf_pid)

@@ -1,55 +1,70 @@
 # Ignition - ComfyUI with Dynamic Model Loading
 # Optimized for RTX 5090 and RunPod deployment
+# Use multi-stage build with caching optimizations
 
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=1
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+# Consolidated environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_PREFER_BINARY=1 \
+    PYTHONUNBUFFERED=1 \
+    CMAKE_BUILD_PARALLEL_LEVEL=8 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-dev \
-    python3-venv \
-    git \
-    wget \
-    curl \
-    unzip \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libtcmalloc-minimal4 \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies with caching
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.11 python3.11-venv python3.11-dev \
+        python3-pip \
+        curl ffmpeg ninja-build git aria2 git-lfs wget vim \
+        libgl1 libglib2.0-0 build-essential gcc && \
+    \
+    # make Python3.11 the default python & pip
+    ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip && \
+    \
+    python3.11 -m venv /opt/venv && \
+    \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Use the virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Set working directory
 WORKDIR /workspace
 
-# Install Python dependencies for downloading and ComfyUI
-RUN pip3 install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
-    requests \
-    aiohttp \
-    aiofiles \
-    huggingface-hub \
-    tqdm \
-    pillow \
-    numpy \
-    opencv-python \
-    psutil
+# Install PyTorch with CUDA 12.8 support
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --pre torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/nightly/cu128
 
-# Clone ComfyUI
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
+# Core Python tooling
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install packaging setuptools wheel
 
-# Install ComfyUI dependencies
-RUN cd /workspace/ComfyUI && pip3 install -r requirements.txt
+# Install ComfyUI using comfy-cli
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install comfy-cli && \
+    /usr/bin/yes | comfy --workspace /workspace install
+
+# Install additional dependencies for Ignition
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
+        requests \
+        aiohttp \
+        aiofiles \
+        huggingface-hub \
+        tqdm \
+        pillow \
+        numpy \
+        opencv-python \
+        psutil
 
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet}
