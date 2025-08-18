@@ -26,9 +26,23 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 
 ## 🚀 Quick Start
 
-### RunPod Template Configuration
+### Automated Template Creation
 
-Set these environment variables in your RunPod template:
+Use the included script to create a pre-configured RunPod template:
+
+```bash
+./template.sh
+```
+
+This interactive script will:
+- Generate a complete RunPod template JSON
+- Set up environment variables for your models
+- Create deployment documentation
+- Provide usage instructions
+
+### Manual RunPod Template Configuration
+
+Alternatively, set these environment variables manually in your RunPod template:
 
 ```bash
 # Required: Specify models to download
