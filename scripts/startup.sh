@@ -120,15 +120,57 @@ setup_storage() {
     log "INFO" ""
 }
 
+# Check if downloads are needed by scanning existing models
+check_downloads_needed() {
+    local civitai_needed=false
+    local hf_needed=false
+    
+    # Quick check for existing models to avoid redundant downloads
+    if [[ -n "$CIVITAI_MODELS" ]]; then
+        # Count existing models in common directories
+        local checkpoint_count=$(find "$COMFYUI_ROOT/models/checkpoints" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | wc -l)
+        local lora_count=$(find "$COMFYUI_ROOT/models/loras" -name "*.safetensors" -o -name "*.pt" 2>/dev/null | wc -l)
+        local vae_count=$(find "$COMFYUI_ROOT/models/vae" -name "*.safetensors" -o -name "*.pt" 2>/dev/null | wc -l)
+        
+        local total_models=$((checkpoint_count + lora_count + vae_count))
+        local civitai_model_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
+        
+        if (( total_models < civitai_model_count )); then
+            civitai_needed=true
+        fi
+        
+        log "INFO" "  • Found $total_models existing models, expecting $civitai_model_count from CivitAI"
+    fi
+    
+    if [[ -n "$HUGGINGFACE_MODELS" ]]; then
+        # Check for HuggingFace models (typically in checkpoints)
+        local hf_checkpoint_count=$(find "$COMFYUI_ROOT/models/checkpoints" -name "*flux*" -o -name "*FLUX*" 2>/dev/null | wc -l)
+        local hf_model_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
+        
+        if (( hf_checkpoint_count < hf_model_count )); then
+            hf_needed=true
+        fi
+        
+        log "INFO" "  • Found $hf_checkpoint_count existing HF models, expecting $hf_model_count"
+    fi
+    
+    echo "$civitai_needed $hf_needed"
+}
+
 # Download models function
 download_models() {
     local download_needed=false
     local download_processes=()
     
-    log "INFO" "📥 Starting model downloads..."
+    log "INFO" "📥 Checking model downloads..."
     
-    # Download CivitAI models
-    if [[ -n "$CIVITAI_MODELS" ]]; then
+    # Smart download check to avoid redundancy
+    local needs_check=$(check_downloads_needed)
+    local civitai_needed=$(echo $needs_check | cut -d' ' -f1)
+    local hf_needed=$(echo $needs_check | cut -d' ' -f2)
+    
+    # Download CivitAI models only if needed
+    if [[ -n "$CIVITAI_MODELS" && "$civitai_needed" == "true" ]]; then
         log "INFO" "🎨 Downloading CivitAI models..."
         download_needed=true
         
@@ -139,10 +181,12 @@ download_models() {
         civitai_pid=$!
         download_processes+=($civitai_pid)
         log "INFO" "  • CivitAI download started (PID: $civitai_pid)"
+    elif [[ -n "$CIVITAI_MODELS" ]]; then
+        log "INFO" "✅ CivitAI models already present, skipping download"
     fi
     
-    # Download HuggingFace models
-    if [[ -n "$HUGGINGFACE_MODELS" ]]; then
+    # Download HuggingFace models only if needed
+    if [[ -n "$HUGGINGFACE_MODELS" && "$hf_needed" == "true" ]]; then
         log "INFO" "🤗 Downloading HuggingFace models..."
         download_needed=true
         
@@ -153,6 +197,8 @@ download_models() {
         hf_pid=$!
         download_processes+=($hf_pid)
         log "INFO" "  • HuggingFace download started (PID: $hf_pid)"
+    elif [[ -n "$HUGGINGFACE_MODELS" ]]; then
+        log "INFO" "✅ HuggingFace models already present, skipping download"
     fi
     
     # Wait for all downloads to complete if any were started
@@ -175,7 +221,7 @@ download_models() {
             log "WARN" "⚠️  Some model downloads failed, but continuing with startup"
         fi
     else
-        log "INFO" "ℹ️  No models specified for download"
+        log "INFO" "ℹ️  All models already present, skipping downloads"
     fi
     
     log "INFO" ""
@@ -193,6 +239,9 @@ start_filebrowser() {
     # Initialize filebrowser database with user (only if doesn't exist)
     if [[ ! -f "$db_path" ]]; then
         log "INFO" "  • Initializing filebrowser database..."
+        # First initialize the config
+        filebrowser -d "$db_path" config init
+        # Then add the admin user
         filebrowser -d "$db_path" users add admin "$FILEBROWSER_PASSWORD" --perm.admin
     fi
     

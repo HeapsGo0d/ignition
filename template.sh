@@ -129,8 +129,8 @@ get_configuration() {
     
     # CivitAI Models with default
     echo -e "${BLUE}CivitAI Models:${NC}"
-    read -p "CivitAI model IDs [128713,46846]: " input_civitai
-    CIVITAI_MODELS=${input_civitai:-"128713,46846"}
+    read -p "CivitAI model IDs [138977,46846]: " input_civitai
+    CIVITAI_MODELS=${input_civitai:-"138977,46846"}
     echo ""
     
     # HuggingFace Models with default
@@ -296,7 +296,7 @@ Once your pod is running:
 ### Required for Model Downloads
 | Variable | Description | Example |
 |----------|-------------|---------|
-| \`CIVITAI_MODELS\` | CivitAI model version IDs | \`128713,46846,5616\` |
+| \`CIVITAI_MODELS\` | CivitAI model version IDs | \`138977,46846,5616\` |
 | \`HUGGINGFACE_MODELS\` | HuggingFace repo names | \`black-forest-labs/FLUX.1-dev\` |
 
 ### Optional Authentication  

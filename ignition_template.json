@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.0.12",
+  "name": "Ignition ComfyUI v1.0.13",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v1.0.12",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v1.0.13",
   "ports": [
     {
       "privatePort": 8188,

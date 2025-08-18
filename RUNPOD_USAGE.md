@@ -27,7 +27,7 @@ Once your pod is running:
 ### Required for Model Downloads
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `CIVITAI_MODELS` | CivitAI model version IDs | `128713,46846,5616` |
+| `CIVITAI_MODELS` | CivitAI model version IDs | `138977,46846,5616` |
 | `HUGGINGFACE_MODELS` | HuggingFace repo names | `black-forest-labs/FLUX.1-dev` |
 
 ### Optional Authentication  
