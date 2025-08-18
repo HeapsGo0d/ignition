@@ -1,6 +1,7 @@
 #!/bin/bash
 # Ignition RunPod Template Creator
 # Creates a RunPod template with pre-configured settings for Ignition
+# Supports both local file generation and direct RunPod API deployment
 
 set -e
 
@@ -17,6 +18,12 @@ DOCKER_IMAGE="heapsg00d/ignition-comfyui:latest"  # Update with your actual Dock
 TEMPLATE_NAME="Ignition ComfyUI v1.0"
 TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace"
 
+# Check for command line arguments
+DEPLOY_MODE="local"  # Default to local file generation
+if [[ "$1" == "--deploy" || "$1" == "-d" ]]; then
+    DEPLOY_MODE="api"
+fi
+
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
@@ -29,13 +36,26 @@ print_banner() {
 
 # Print usage information
 print_usage() {
-    echo -e "${YELLOW}📋 This script will create a RunPod template for Ignition${NC}"
+    echo -e "${YELLOW}📋 Ignition RunPod Template Creator${NC}"
     echo ""
-    echo -e "${BLUE}What you'll need:${NC}"
-    echo "  • RunPod account with API access"
+    
+    if [[ "$DEPLOY_MODE" == "api" ]]; then
+        echo -e "${GREEN}🚀 API Deployment Mode${NC} - Will create template directly in RunPod"
+        echo -e "${BLUE}Requirements:${NC}"
+        echo "  • RunPod API key (set RUNPOD_API_KEY environment variable)"
+        echo "  • curl command available"
+        echo ""
+    else
+        echo -e "${BLUE}📁 Local File Mode${NC} - Will generate files for manual upload"
+        echo -e "${YELLOW}💡 Tip: Use './template.sh --deploy' for automatic deployment${NC}"
+        echo ""
+    fi
+    
+    echo -e "${BLUE}What you'll configure:${NC}"
     echo "  • CivitAI model version IDs (optional)"
     echo "  • HuggingFace repository names (optional)"
     echo "  • API tokens for faster downloads (optional)"
+    echo "  • Storage and security settings"
     echo ""
     echo -e "${GREEN}Template will include:${NC}"
     echo "  ✅ Pre-configured Docker image"
@@ -44,6 +64,33 @@ print_usage() {
     echo "  ✅ GPU support enabled"
     echo "  ✅ Network volume support"
     echo ""
+}
+
+# Check API key if in deploy mode
+check_api_requirements() {
+    if [[ "$DEPLOY_MODE" == "api" ]]; then
+        if [[ -z "$RUNPOD_API_KEY" ]]; then
+            echo -e "${RED}❌ Error: RUNPOD_API_KEY environment variable not set${NC}"
+            echo ""
+            echo -e "${YELLOW}To use API deployment mode:${NC}"
+            echo "1. Get your API key from RunPod → Settings → API Keys"
+            echo "2. Export it: export RUNPOD_API_KEY=\"your_key_here\""
+            echo "3. Run the script again: ./template.sh --deploy"
+            echo ""
+            echo -e "${BLUE}Or use local file mode: ./template.sh${NC}"
+            exit 1
+        fi
+        
+        # Check if curl is available
+        if ! command -v curl &> /dev/null; then
+            echo -e "${RED}❌ Error: curl command not found${NC}"
+            echo "Please install curl to use API deployment mode"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}✅ API key found, deployment mode ready${NC}"
+        echo ""
+    fi
 }
 
 # Get user input for configuration
@@ -300,10 +347,91 @@ FILEBROWSER_PASSWORD="secure_password_123"
 EOF
 }
 
+# Deploy template via RunPod API
+deploy_template() {
+    echo -e "${YELLOW}🚀 Deploying template to RunPod...${NC}"
+    
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+        echo -e "${RED}❌ Error: jq command not found${NC}"
+        echo "Please install jq to use API deployment mode"
+        echo "Or use local file mode: ./template.sh"
+        return 1
+    fi
+    
+    # Create simplified API payload (RunPod API format)
+    local api_payload=$(cat << EOF
+{
+  "name": "$TEMPLATE_NAME",
+  "description": "$TEMPLATE_DESCRIPTION", 
+  "dockerImage": "$DOCKER_IMAGE",
+  "ports": [
+    {"privatePort": 8188, "publicPort": 8188, "type": "http"},
+    {"privatePort": 8080, "publicPort": 8080, "type": "http"}
+  ],
+  "env": [
+    {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
+    {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
+    {"key": "CIVITAI_TOKEN", "value": ""},
+    {"key": "HF_TOKEN", "value": ""},
+    {"key": "PERSISTENT_STORAGE", "value": "$PERSISTENT_STORAGE"},
+    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
+  ],
+  "volumeMounts": [
+    {"containerPath": "/workspace", "name": "workspace"}
+  ]
+}
+EOF
+)
+    
+    echo -e "${BLUE}Sending request to RunPod API...${NC}"
+    
+    # Make API call to create template
+    local response=$(curl -s -X POST \
+        "https://api.runpod.io/graphql" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -d "$(cat << EOF
+{
+  "query": "mutation(\$input: SaveTemplateInput!) { saveTemplate(input: \$input) { id name } }",
+  "variables": {
+    "input": $api_payload
+  }
+}
+EOF
+)")
+    
+    # Check for errors
+    if echo "$response" | grep -q '"errors"'; then
+        echo -e "${RED}❌ API Error:${NC}"
+        echo "$response" | jq -r '.errors[0].message' 2>/dev/null || echo "$response"
+        return 1
+    fi
+    
+    # Extract template info
+    local template_id=$(echo "$response" | jq -r '.data.saveTemplate.id' 2>/dev/null)
+    local template_name=$(echo "$response" | jq -r '.data.saveTemplate.name' 2>/dev/null)
+    
+    if [[ "$template_id" != "null" && "$template_id" != "" && "$template_id" != "null" ]]; then
+        echo -e "${GREEN}✅ Template deployed successfully!${NC}"
+        echo -e "${BLUE}Template ID:${NC} $template_id"
+        echo -e "${BLUE}Template Name:${NC} $template_name"
+        echo -e "${BLUE}RunPod Console:${NC} https://runpod.io/console/user/templates"
+        return 0
+    else
+        echo -e "${RED}❌ Failed to deploy template${NC}"
+        echo -e "${YELLOW}Response:${NC} $response"
+        return 1
+    fi
+}
+
 # Main execution
 main() {
     print_banner
     print_usage
+    
+    # Check API requirements if in deploy mode
+    check_api_requirements
     
     echo -e "${YELLOW}Press Enter to continue with template creation...${NC}"
     read
@@ -315,17 +443,39 @@ main() {
     generate_instructions
     print_summary
     
-    echo -e "${GREEN}✅ Template files created successfully!${NC}"
-    echo ""
-    echo -e "${BLUE}Generated Files:${NC}"
-    echo "  📄 ignition_template.json - RunPod template definition"
-    echo "  📖 RUNPOD_USAGE.md - Deployment and usage guide"
-    echo ""
-    echo -e "${YELLOW}Next Steps:${NC}"
-    echo "  1. Upload ignition_template.json to RunPod Templates"
-    echo "  2. Deploy a pod using your new template"
-    echo "  3. Access ComfyUI at http://[pod-id]-8188.proxy.runpod.net"
-    echo "  4. Manage files at http://[pod-id]-8080.proxy.runpod.net"
+    if [[ "$DEPLOY_MODE" == "api" ]]; then
+        echo -e "${YELLOW}🚀 Deploying to RunPod...${NC}"
+        if deploy_template; then
+            echo ""
+            echo -e "${GREEN}✅ Template deployed successfully!${NC}"
+            echo ""
+            echo -e "${YELLOW}Next Steps:${NC}"
+            echo "  1. Go to RunPod Console → Templates"
+            echo "  2. Find your '$TEMPLATE_NAME' template"
+            echo "  3. Deploy a pod using your new template"
+            echo "  4. Access ComfyUI at http://[pod-id]-8188.proxy.runpod.net"
+            echo "  5. Manage files at http://[pod-id]-8080.proxy.runpod.net"
+        else
+            echo ""
+            echo -e "${YELLOW}⚠️  API deployment failed, but local files were created${NC}"
+            echo -e "${BLUE}You can still upload ignition_template.json manually${NC}"
+        fi
+    else
+        echo -e "${GREEN}✅ Template files created successfully!${NC}"
+        echo ""
+        echo -e "${BLUE}Generated Files:${NC}"
+        echo "  📄 ignition_template.json - RunPod template definition"
+        echo "  📖 RUNPOD_USAGE.md - Deployment and usage guide"
+        echo ""
+        echo -e "${YELLOW}Next Steps:${NC}"
+        echo "  1. Upload ignition_template.json to RunPod Templates"
+        echo "  2. Deploy a pod using your new template"
+        echo "  3. Access ComfyUI at http://[pod-id]-8188.proxy.runpod.net"
+        echo "  4. Manage files at http://[pod-id]-8080.proxy.runpod.net"
+        echo ""
+        echo -e "${BLUE}💡 Tip: Use './template.sh --deploy' for automatic deployment${NC}"
+    fi
+    
     echo ""
     echo -e "${GREEN}🚀 Happy creating with Ignition!${NC}"
 }

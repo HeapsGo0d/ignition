@@ -30,15 +30,27 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 
 Use the included script to create a pre-configured RunPod template:
 
+#### **Option 1: Local File Generation (Default)**
 ```bash
 ./template.sh
 ```
 
-This interactive script will:
+#### **Option 2: Direct API Deployment**
+```bash
+export RUNPOD_API_KEY="your_runpod_api_key_here"
+./template.sh --deploy
+```
+
+**Both modes will:**
 - Generate a complete RunPod template JSON
 - Set up environment variables for your models
 - Create deployment documentation
 - Provide usage instructions
+
+**API deployment mode additionally:**
+- Creates the template directly in your RunPod account
+- No manual upload needed
+- Immediate template availability
 
 ### Manual RunPod Template Configuration
 
