@@ -14,7 +14,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsg00d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
 TEMPLATE_NAME="Ignition ComfyUI v1.0"
 TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace"
 
@@ -140,6 +140,12 @@ get_configuration() {
     echo "Persistence handled by RunPod volume settings:"
     echo "  • Volume 0GB = Ephemeral (models download each time)"  
     echo "  • Volume >0GB = Persistent (models survive restarts)"
+    echo ""
+
+    # Security settings
+    echo -e "${BLUE}Security Settings:${NC}"
+    read -p "File browser password [runpod]: " input_password
+    FILEBROWSER_PASSWORD=${input_password:-runpod}
     echo ""
 
     # Disk settings
