@@ -109,43 +109,47 @@ get_configuration() {
     echo -e "${YELLOW}🔧 Configuration Setup${NC}"
     echo ""
     
-    # Docker image
-    echo -e "${BLUE}Docker Image:${NC}"
-    read -p "Enter Docker image name [$DOCKER_IMAGE]: " input_image
-    DOCKER_IMAGE=${input_image:-$DOCKER_IMAGE}
+    # Version input (easy mode)
+    echo -e "${BLUE}Version:${NC}"
+    read -p "Enter version tag (e.g., v1.0.12) [latest]: " version_input
+    VERSION_TAG=${version_input:-latest}
+    
+    # Auto-generate image and template names based on version
+    if [[ "$VERSION_TAG" == "latest" ]]; then
+        DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"
+        TEMPLATE_NAME="Ignition ComfyUI Latest"
+    else
+        DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG"
+        TEMPLATE_NAME="Ignition ComfyUI $VERSION_TAG"
+    fi
+    
+    echo "  → Docker Image: $DOCKER_IMAGE"
+    echo "  → Template Name: $TEMPLATE_NAME"
     echo ""
     
-    # Template name
-    echo -e "${BLUE}Template Name:${NC}"
-    read -p "Enter template name [$TEMPLATE_NAME]: " input_name
-    TEMPLATE_NAME=${input_name:-$TEMPLATE_NAME}
+    # CivitAI Models with default
+    echo -e "${BLUE}CivitAI Models:${NC}"
+    read -p "CivitAI model IDs [128713,46846]: " input_civitai
+    CIVITAI_MODELS=${input_civitai:-"128713,46846"}
     echo ""
     
-    # CivitAI Models
-    echo -e "${BLUE}CivitAI Models (optional):${NC}"
-    echo "Enter comma-separated version IDs (e.g., 128713,46846,5616)"
-    echo "Leave blank to skip CivitAI downloads"
-    read -p "CivitAI model IDs: " CIVITAI_MODELS
+    # HuggingFace Models with default
+    echo -e "${BLUE}HuggingFace Models:${NC}"
+    read -p "HuggingFace repositories [black-forest-labs/FLUX.1-dev]: " input_hf
+    HUGGINGFACE_MODELS=${input_hf:-"black-forest-labs/FLUX.1-dev"}
     echo ""
     
-    # HuggingFace Models
-    echo -e "${BLUE}HuggingFace Models (optional):${NC}"
-    echo "Enter comma-separated repository names (e.g., black-forest-labs/FLUX.1-dev)"
-    echo "Leave blank to skip HuggingFace downloads"
-    read -p "HuggingFace repositories: " HUGGINGFACE_MODELS
+    # Security settings with default
+    echo -e "${BLUE}Security Settings:${NC}"
+    read -p "File browser password [runpod]: " input_password
+    FILEBROWSER_PASSWORD=${input_password:-runpod}
     echo ""
-    
-    # Note: Persistent storage handled by RunPod volume settings
+
+    # Note about storage
     echo -e "${BLUE}Storage Note:${NC}"
     echo "Persistence handled by RunPod volume settings:"
     echo "  • Volume 0GB = Ephemeral (models download each time)"  
     echo "  • Volume >0GB = Persistent (models survive restarts)"
-    echo ""
-
-    # Security settings
-    echo -e "${BLUE}Security Settings:${NC}"
-    read -p "File browser password [runpod]: " input_password
-    FILEBROWSER_PASSWORD=${input_password:-runpod}
     echo ""
 
     # Disk settings
@@ -371,8 +375,8 @@ deploy_template() {
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
-    {"key": "CIVITAI_TOKEN", "value": ""},
-    {"key": "HF_TOKEN", "value": ""},
+    {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
+    {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
   ]
 }

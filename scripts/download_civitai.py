@@ -143,8 +143,8 @@ class CivitAIDownloader:
             logger.error(f"Error downloading {filename}: {e}")
             return False
 
-    async def process_model(self, version_id: str) -> bool:
-        """Process a single model download."""
+    async def process_model(self, version_id: str, max_retries: int = 2) -> bool:
+        """Process a single model download with retry logic."""
         try:
             # Get model information
             model_info = await self.get_model_info(version_id)
@@ -175,23 +175,43 @@ class CivitAIDownloader:
                 logger.info(f"File already exists and is valid: {filename}")
                 return True
             
-            # Download to temporary location
-            temp_path = file_handler.get_temp_path(filename)
+            # Retry logic for download and processing
+            for attempt in range(max_retries + 1):
+                try:
+                    if attempt > 0:
+                        logger.info(f"Retry attempt {attempt} for {filename}")
+                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    
+                    # Download to temporary location
+                    temp_path = file_handler.get_temp_path(filename)
+                    
+                    if not await self.download_file(download_url, temp_path, filename, file_size):
+                        if attempt == max_retries:
+                            return False
+                        continue
+                    
+                    # Process the download atomically
+                    success = file_handler.process_download(
+                        temp_path, filename, model_type, file_size, file_hash
+                    )
+                    
+                    if success:
+                        logger.info(f"Successfully processed model: {filename}")
+                        return True
+                    elif attempt == max_retries:
+                        logger.error(f"Failed to process model after {max_retries + 1} attempts: {filename}")
+                        return False
+                    else:
+                        logger.warning(f"Processing failed for {filename}, retrying...")
+                        
+                except Exception as e:
+                    if attempt == max_retries:
+                        logger.error(f"Final attempt failed for {filename}: {e}")
+                        return False
+                    else:
+                        logger.warning(f"Attempt {attempt + 1} failed for {filename}: {e}")
             
-            if not await self.download_file(download_url, temp_path, filename, file_size):
-                return False
-            
-            # Process the download atomically
-            success = file_handler.process_download(
-                temp_path, filename, model_type, file_size, file_hash
-            )
-            
-            if success:
-                logger.info(f"Successfully processed model: {filename}")
-            else:
-                logger.error(f"Failed to process model: {filename}")
-                
-            return success
+            return False
             
         except Exception as e:
             logger.error(f"Error processing model {version_id}: {e}")

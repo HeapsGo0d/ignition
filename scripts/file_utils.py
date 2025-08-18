@@ -69,7 +69,8 @@ class AtomicFileHandler:
         # Check file hash if provided
         if expected_hash is not None:
             actual_hash = self.calculate_file_hash(file_path)
-            if actual_hash != expected_hash:
+            # Normalize both hashes to lowercase for comparison
+            if actual_hash.strip().lower() != expected_hash.strip().lower():
                 logger.error(f"Hash mismatch: expected {expected_hash}, got {actual_hash}")
                 return False
         

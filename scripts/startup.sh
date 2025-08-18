@@ -185,19 +185,24 @@ download_models() {
 start_filebrowser() {
     log "INFO" "📁 Starting file browser..."
     
-    # Create filebrowser config
-    local config_dir="/tmp/filebrowser"
+    # Create filebrowser config in persistent storage
+    local config_dir="$WORKSPACE_ROOT/.filebrowser"
+    local db_path="$config_dir/filebrowser.db"
     mkdir -p "$config_dir"
+    
+    # Initialize filebrowser database with user (only if doesn't exist)
+    if [[ ! -f "$db_path" ]]; then
+        log "INFO" "  • Initializing filebrowser database..."
+        filebrowser -d "$db_path" users add admin "$FILEBROWSER_PASSWORD" --perm.admin
+    fi
     
     # Start filebrowser in background
     filebrowser \
         --root "$WORKSPACE_ROOT" \
         --port "$FILEBROWSER_PORT" \
         --address "0.0.0.0" \
-        --username "admin" \
-        --password "$FILEBROWSER_PASSWORD" \
-        --database "$config_dir/filebrowser.db" \
-        --log /tmp/filebrowser.log &
+        --database "$db_path" \
+        --log "$config_dir/filebrowser.log" &
     
     local fb_pid=$!
     log "INFO" "  • File browser started on port $FILEBROWSER_PORT (PID: $fb_pid)"

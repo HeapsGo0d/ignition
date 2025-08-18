@@ -105,9 +105,7 @@ class HuggingFaceDownloader:
                     repo_id=repo_id,
                     filename=filename,
                     token=self.token,
-                    local_dir=str(temp_path.parent),
-                    local_dir_use_symlinks=False,  # Ensure we get actual files
-                    resume_download=True  # Resume partial downloads
+                    local_dir=str(temp_path.parent)
                 )
                 
                 # The downloaded file might be in a subdirectory structure
