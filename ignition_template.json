@@ -1,0 +1,68 @@
+{
+  "name": "Ignition ComfyUI v1.0",
+  "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
+  "dockerImage": "heapsg00d/ignition-comfyui:latest",
+  "ports": [
+    {
+      "privatePort": 8188,
+      "publicPort": 8188,
+      "type": "http",
+      "description": "ComfyUI Web Interface"
+    },
+    {
+      "privatePort": 8080,
+      "publicPort": 8080,
+      "type": "http",
+      "description": "File Browser"
+    }
+  ],
+  "volumeMounts": [
+    {
+      "containerPath": "/workspace",
+      "name": "workspace"
+    }
+  ],
+  "environmentVariables": [
+    {
+      "key": "CIVITAI_MODELS",
+      "value": "128713,46846",
+      "description": "Comma-separated CivitAI model version IDs"
+    },
+    {
+      "key": "HUGGINGFACE_MODELS", 
+      "value": "black-forest-labs/FLUX.1-dev",
+      "description": "Comma-separated HuggingFace repository names"
+    },
+    {
+      "key": "CIVITAI_TOKEN",
+      "value": "",
+      "description": "CivitAI API token (optional, for faster downloads)"
+    },
+    {
+      "key": "HF_TOKEN",
+      "value": "",
+      "description": "HuggingFace API token (optional, for private repos)"
+    },
+    {
+      "key": "PERSISTENT_STORAGE",
+      "value": "/workspace/persistent_models",
+      "description": "Persistent storage path or 'none'"
+    },
+    {
+      "key": "FILEBROWSER_PASSWORD",
+      "value": "testpassword123",
+      "description": "Password for file browser access"
+    },
+    {
+      "key": "COMFYUI_PORT",
+      "value": "8188",
+      "description": "ComfyUI web interface port"
+    },
+    {
+      "key": "FILEBROWSER_PORT",
+      "value": "8080", 
+      "description": "File browser port"
+    }
+  ],
+  "startScript": "bash /workspace/scripts/startup.sh"
+}

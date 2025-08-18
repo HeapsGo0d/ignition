@@ -365,6 +365,8 @@ deploy_template() {
   "name": "$TEMPLATE_NAME",
   "description": "$TEMPLATE_DESCRIPTION", 
   "dockerImage": "$DOCKER_IMAGE",
+  "containerDiskInGb": 50,
+  "dockerArgs": "",
   "ports": [
     {"privatePort": 8188, "publicPort": 8188, "type": "http"},
     {"privatePort": 8080, "publicPort": 8080, "type": "http"}
