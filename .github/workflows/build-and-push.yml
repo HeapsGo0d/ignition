@@ -14,6 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # Remove tool cache (saves ~15 GB)
+        tool-cache: true
+        # Remove Android SDK (saves ~11 GB)
+        android: true
+        # Remove .NET (saves ~2 GB)
+        dotnet: true
+        # Remove Haskell (saves ~2.7 GB)
+        haskell: true
+        # Keep large packages that might be needed
+        large-packages: false
+        # Remove Docker images (saves space but we need Docker)
+        docker-images: false
+        
     - name: Checkout repository
       uses: actions/checkout@v4
       
@@ -46,6 +62,9 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        # Optimize for space and speed
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
         
     - name: Image digest
       run: echo ${{ steps.meta.outputs.digest }}
