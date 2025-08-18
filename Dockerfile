@@ -2,7 +2,7 @@
 # Optimized for RTX 5090 and RunPod deployment
 # Use multi-stage build with caching optimizations
 
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
+FROM nvidia/cuda:12.1.1-cudnn-devel-ubuntu22.04 AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -16,20 +16,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.11 python3.11-venv python3.11-dev \
-        python3-pip \
+        python3 python3-pip python3-dev python3-venv \
         curl ffmpeg ninja-build git aria2 git-lfs wget vim \
-        libgl1 libglib2.0-0 build-essential gcc && \
+        libgl1-mesa-glx libglib2.0-0 build-essential gcc \
+        software-properties-common && \
     \
-    # make Python3.11 the default python & pip
-    ln -sf /usr/bin/python3.11 /usr/bin/python && \
-    ln -sf /usr/bin/pip3 /usr/bin/pip && \
-    \
-    python3.11 -m venv /opt/venv && \
+    # Create virtual environment with system Python3
+    python3 -m venv /opt/venv && \
     \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -39,10 +32,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Set working directory
 WORKDIR /workspace
 
-# Install PyTorch with CUDA 12.4 (more stable than cu128)
+# Install PyTorch with CUDA 12.1 (matching base image)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu124
+        --index-url https://download.pytorch.org/whl/cu121
 
 # Core Python tooling  
 RUN --mount=type=cache,target=/root/.cache/pip \
