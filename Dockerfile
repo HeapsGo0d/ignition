@@ -23,13 +23,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Runtime libraries including comfy-cli
+# Runtime libraries
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install pyyaml gdown triton comfy-cli
+    pip install pyyaml gdown triton
 
-# Install ComfyUI using comfy-cli  
-RUN --mount=type=cache,target=/root/.cache/pip \
-    /usr/bin/yes | comfy --workspace /workspace install
+# Install ComfyUI directly (more reliable than comfy-cli)
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
+    cd /workspace/ComfyUI && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
