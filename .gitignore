@@ -34,3 +34,4 @@ Thumbs.db
 # Local testing
 test_downloads/
 models_temp/
+template_inputs.txt

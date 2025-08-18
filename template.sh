@@ -18,6 +18,10 @@ DOCKER_IMAGE="heapsg00d/ignition-comfyui:latest"  # Update with your actual Dock
 TEMPLATE_NAME="Ignition ComfyUI v1.0"
 TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace"
 
+# Disk defaults (can be overridden interactively or via env)
+CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
+VOLUME_GB="${VOLUME_GB:-0}"
+
 # Check for command line arguments
 DEPLOY_MODE="local"  # Default to local file generation
 if [[ "$1" == "--deploy" || "$1" == "-d" ]]; then
@@ -81,13 +85,20 @@ check_api_requirements() {
             exit 1
         fi
         
-        # Check if curl is available
+        # curl must exist
         if ! command -v curl &> /dev/null; then
             echo -e "${RED}❌ Error: curl command not found${NC}"
             echo "Please install curl to use API deployment mode"
             exit 1
         fi
-        
+
+        # jq is optional
+        if ! command -v jq &> /dev/null; then
+            echo -e "${YELLOW}⚠️  jq not found — will show raw JSON and use a basic parser fallback${NC}"
+        else
+            echo -e "${GREEN}✅ jq detected — pretty JSON parsing enabled${NC}"
+        fi
+
         echo -e "${GREEN}✅ API key found, deployment mode ready${NC}"
         echo ""
     fi
@@ -130,15 +141,17 @@ get_configuration() {
     echo "  • Volume 0GB = Ephemeral (models download each time)"  
     echo "  • Volume >0GB = Persistent (models survive restarts)"
     echo ""
-    
-    # File Browser Password
-    echo -e "${BLUE}File Browser Security:${NC}"
-    read -p "Enter file browser password [runpod]: " fb_password
-    FILEBROWSER_PASSWORD=${fb_password:-runpod}
+
+    # Disk settings
+    echo -e "${BLUE}Disk Settings:${NC}"
+    read -p "Container disk size in GB [${CONTAINER_DISK_GB}]: " tmp_disk
+    CONTAINER_DISK_GB=${tmp_disk:-$CONTAINER_DISK_GB}
+    read -p "Default volume size in GB (0 = ephemeral) [${VOLUME_GB}]: " tmp_vol
+    VOLUME_GB=${tmp_vol:-$VOLUME_GB}
     echo ""
 }
 
-# Generate template JSON
+# Generate template JSON (manual upload option; schema differs from API)
 generate_template() {
     cat > ignition_template.json << EOF
 {
@@ -212,6 +225,15 @@ generate_template() {
 EOF
 }
 
+# Friendly human-readable storage note
+make_storage_note() {
+  if [[ "$VOLUME_GB" =~ ^[0-9]+$ ]] && (( VOLUME_GB > 0 )); then
+    echo "Persistent volume ${VOLUME_GB}GB (models survive restarts)"
+  else
+    echo "Ephemeral volume (0GB; models redownload each start)"
+  fi
+}
+
 # Print template summary
 print_summary() {
     echo -e "${GREEN}📋 Template Configuration Summary:${NC}"
@@ -219,7 +241,7 @@ print_summary() {
     echo -e "${BLUE}Template Details:${NC}"
     echo "  Name: $TEMPLATE_NAME"
     echo "  Docker Image: $DOCKER_IMAGE"
-    echo "  Persistent Storage: $PERSISTENT_STORAGE"
+    echo "  Storage: $(make_storage_note)"
     echo ""
     echo -e "${BLUE}Model Configuration:${NC}"
     echo "  CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
@@ -274,9 +296,7 @@ Once your pod is running:
 | \`HF_TOKEN\` | HuggingFace token | https://huggingface.co/settings/tokens |
 
 ### Storage Configuration
-| Variable | Description | Options |
-|----------|-------------|---------|
-| \`PERSISTENT_STORAGE\` | Model storage path | \`/workspace/persistent_models\` or \`none\` |
+Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_GB}GB volume)
 
 ## Finding Model IDs
 
@@ -302,39 +322,13 @@ Once your pod is running:
 ## Troubleshooting
 
 ### Logs
-- SSH into pod: \`ssh root@[pod-id].proxy.runpod.net\`
+- SSH into pod: \`ssh root@[pod-id]-ssh.proxy.runpod.net\`
 - View logs: \`tail -f /tmp/ignition_startup.log\`
 
 ### Common Issues
 - **No models downloading**: Check model IDs are correct
 - **Out of space**: Use persistent storage or smaller models
 - **Slow downloads**: Add API tokens for authentication
-
-## Example Configurations
-
-### Basic Setup
-\`\`\`bash
-CIVITAI_MODELS="128713,46846"
-HUGGINGFACE_MODELS="runwayml/stable-diffusion-v1-5"
-PERSISTENT_STORAGE="/workspace/persistent_models"
-\`\`\`
-
-### Flux-Focused
-\`\`\`bash
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev,black-forest-labs/FLUX.1-schnell"
-CIVITAI_MODELS="5616,12345"
-PERSISTENT_STORAGE="/workspace/flux_models"
-\`\`\`
-
-### Production Setup
-\`\`\`bash
-CIVITAI_MODELS="128713,46846,5616"
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev"
-CIVITAI_TOKEN="your_token_here"
-HF_TOKEN="hf_your_token_here"
-PERSISTENT_STORAGE="/workspace/persistent_models"
-FILEBROWSER_PASSWORD="secure_password_123"
-\`\`\`
 
 ---
 **🚀 Ready to create amazing AI art with Ignition!**
@@ -344,26 +338,30 @@ EOF
 # Deploy template via RunPod API
 deploy_template() {
     echo -e "${YELLOW}🚀 Deploying template to RunPod...${NC}"
-    
-    # Check if jq is available
-    if ! command -v jq &> /dev/null; then
-        echo -e "${RED}❌ Error: jq command not found${NC}"
-        echo "Please install jq to use API deployment mode"
-        echo "Or use local file mode: ./template.sh"
-        return 1
+
+    # jq optional detection
+    HAS_JQ=true
+    if ! command -v jq &>/dev/null; then
+        HAS_JQ=false
+        echo -e "${YELLOW}⚠️ jq not found — responses will be raw JSON with basic parsing${NC}"
+        echo ""
     fi
     
-    # Create API payload using catalyst's proven format
+    # Build a dynamic storage note for README
+    local STORAGE_NOTE
+    STORAGE_NOTE="$(make_storage_note)"
+
+    # Create API payload (GraphQL expects string with escaped newlines)
     local api_payload=$(cat << EOF
 {
   "name": "$TEMPLATE_NAME",
   "imageName": "$DOCKER_IMAGE",
-  "containerDiskInGb": 200,
-  "volumeInGb": 0,
+  "containerDiskInGb": $CONTAINER_DISK_GB,
+  "volumeInGb": $VOLUME_GB,
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
   "ports": "8188/http,8080/http",
-  "readme": "# $TEMPLATE_NAME\n\n$TEMPLATE_DESCRIPTION\n\n## Configuration\n- CivitAI Models: $CIVITAI_MODELS\n- HuggingFace Models: $HUGGINGFACE_MODELS\n- Storage: Set volume size in RunPod (0GB=ephemeral, >0GB=persistent)",
+  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
@@ -377,7 +375,7 @@ EOF
     
     echo -e "${BLUE}Sending request to RunPod API...${NC}"
     
-    # Make API call using catalyst's proven GraphQL format
+    # Make API call
     local response=$(curl -s -X POST \
         "https://api.runpod.io/graphql" \
         -H "Content-Type: application/json" \
@@ -391,19 +389,31 @@ EOF
 }
 EOF
 )")
-    
-    # Check for errors
+
+    # Error detection
     if echo "$response" | grep -q '"errors"'; then
         echo -e "${RED}❌ API Error:${NC}"
-        echo "$response" | jq -r '.errors[0].message' 2>/dev/null || echo "$response"
+        if $HAS_JQ; then
+            echo "$response" | jq -r '.errors[0].message'
+        else
+            echo "$response"
+        fi
         return 1
     fi
     
     # Extract template info
-    local template_id=$(echo "$response" | jq -r '.data.saveTemplate.id' 2>/dev/null)
-    local template_name=$(echo "$response" | jq -r '.data.saveTemplate.name' 2>/dev/null)
+    local template_id
+    local template_name
+    if $HAS_JQ; then
+        template_id=$(echo "$response" | jq -r '.data.saveTemplate.id')
+        template_name=$(echo "$response" | jq -r '.data.saveTemplate.name')
+    else
+        # Fallback parsing (best-effort)
+        template_id=$(echo "$response" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4)
+        template_name=$(echo "$response" | grep -o '"name":"[^"]*' | head -n1 | cut -d'"' -f4)
+    fi
     
-    if [[ "$template_id" != "null" && "$template_id" != "" && "$template_id" != "null" ]]; then
+    if [[ -n "$template_id" && "$template_id" != "null" ]]; then
         echo -e "${GREEN}✅ Template deployed successfully!${NC}"
         echo -e "${BLUE}Template ID:${NC} $template_id"
         echo -e "${BLUE}Template Name:${NC} $template_name"

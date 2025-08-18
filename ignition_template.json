@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.0.3 Final",
+  "name": "Ignition ComfyUI v1.0.10",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsg00d/ignition-comfyui:v1.0.3",
+  "dockerImage": "heapsg00d/ignition-comfyui:v1.0.10",
   "ports": [
     {
       "privatePort": 8188,
@@ -50,7 +50,7 @@
     },
     {
       "key": "FILEBROWSER_PASSWORD",
-      "value": "final_test_2024",
+      "value": "",
       "description": "Password for file browser access"
     },
     {

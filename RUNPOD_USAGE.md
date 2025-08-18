@@ -20,7 +20,7 @@ Once your pod is running:
 - **ComfyUI**: `http://[your-pod-id]-8188.proxy.runpod.net`
 - **File Browser**: `http://[your-pod-id]-8080.proxy.runpod.net`
   - Username: `admin`
-  - Password: `final_test_2024`
+  - Password: ``
 
 ## Environment Variables
 
@@ -37,9 +37,7 @@ Once your pod is running:
 | `HF_TOKEN` | HuggingFace token | https://huggingface.co/settings/tokens |
 
 ### Storage Configuration
-| Variable | Description | Options |
-|----------|-------------|---------|
-| `PERSISTENT_STORAGE` | Model storage path | `/workspace/persistent_models` or `none` |
+Storage: Ephemeral volume (0GB; models redownload each start) (Container: 200GB disk, 0GB volume)
 
 ## Finding Model IDs
 
@@ -65,39 +63,13 @@ Once your pod is running:
 ## Troubleshooting
 
 ### Logs
-- SSH into pod: `ssh root@[pod-id].proxy.runpod.net`
+- SSH into pod: `ssh root@[pod-id]-ssh.proxy.runpod.net`
 - View logs: `tail -f /tmp/ignition_startup.log`
 
 ### Common Issues
 - **No models downloading**: Check model IDs are correct
 - **Out of space**: Use persistent storage or smaller models
 - **Slow downloads**: Add API tokens for authentication
-
-## Example Configurations
-
-### Basic Setup
-```bash
-CIVITAI_MODELS="128713,46846"
-HUGGINGFACE_MODELS="runwayml/stable-diffusion-v1-5"
-PERSISTENT_STORAGE="/workspace/persistent_models"
-```
-
-### Flux-Focused
-```bash
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev,black-forest-labs/FLUX.1-schnell"
-CIVITAI_MODELS="5616,12345"
-PERSISTENT_STORAGE="/workspace/flux_models"
-```
-
-### Production Setup
-```bash
-CIVITAI_MODELS="128713,46846,5616"
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev"
-CIVITAI_TOKEN="your_token_here"
-HF_TOKEN="hf_your_token_here"
-PERSISTENT_STORAGE="/workspace/persistent_models"
-FILEBROWSER_PASSWORD="secure_password_123"
-```
 
 ---
 **🚀 Ready to create amazing AI art with Ignition!**

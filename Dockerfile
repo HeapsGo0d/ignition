@@ -2,7 +2,7 @@
 # Optimized for RTX 5090 and RunPod deployment
 # Using NVIDIA's official PyTorch container (proven RTX 5090 support)
 
-FROM nvcr.io/nvidia/pytorch:24.04-py3 AS base
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
