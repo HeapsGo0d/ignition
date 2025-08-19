@@ -36,7 +36,7 @@ log() {
             ;;
         "DEBUG")
             if [[ "$DEBUG_MODE" == "true" ]]; then
-                echo -e "${BLUE}[DEBUG]${NC} $message" | tee -a "$LOG_FILE"
+                echo -e "${BLUE}[DEBUG]${NC} $message" | tee -a "$LOG_FILE" >&2
             fi
             ;;
         *)
