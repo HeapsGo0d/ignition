@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.0.13",
+  "name": "Ignition ComfyUI v1.0.20",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v1.0.13",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v1.0.20",
   "ports": [
     {
       "privatePort": 8188,
@@ -25,7 +25,7 @@
   "environmentVariables": [
     {
       "key": "CIVITAI_MODELS",
-      "value": "138977",
+      "value": "450105,1569593",
       "description": "Comma-separated CivitAI model version IDs"
     },
     {
@@ -66,7 +66,12 @@
     {
       "key": "FORCE_MODEL_SYNC",
       "value": "false",
-      "description": "Force model downloads even if files detected (true/false)"
+      "description": "Force model downloads even if files exist"
+    },
+    {
+      "key": "DEBUG_MODE",
+      "value": "false",
+      "description": "Enable debug logging for troubleshooting"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"

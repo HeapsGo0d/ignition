@@ -228,6 +228,16 @@ generate_template() {
       "key": "FILEBROWSER_PORT",
       "value": "8080", 
       "description": "File browser port"
+    },
+    {
+      "key": "FORCE_MODEL_SYNC",
+      "value": "false",
+      "description": "Force model downloads even if files exist"
+    },
+    {
+      "key": "DEBUG_MODE",
+      "value": "false",
+      "description": "Enable debug logging for troubleshooting"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
@@ -378,7 +388,8 @@ deploy_template() {
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
-    {"key": "FORCE_MODEL_SYNC", "value": "false"}
+    {"key": "FORCE_MODEL_SYNC", "value": "false"},
+    {"key": "DEBUG_MODE", "value": "false"}
   ]
 }
 EOF
