@@ -60,6 +60,11 @@ export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 export DEBUG_MODE="${DEBUG_MODE:-false}"
 
+# --- GPU visibility defaults (make Torch/ComfyUI see GPU 0 consistently) ---
+export NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-0}
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+export NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
 # Health marker file to track successful boots
 HEALTH_MARKER_FILE="$WORKSPACE_ROOT/.ignition_ok"
 
@@ -114,6 +119,23 @@ check_system() {
     
     log "INFO" "✅ System requirements check complete"
     log "INFO" ""
+}
+
+# Ensure Python/Torch can actually see a CUDA GPU before launching ComfyUI
+cuda_preflight() {
+    if command -v nvidia-smi &>/dev/null; then
+        log "INFO" "🔧 Verifying CUDA visibility for Python/Torch…"
+        python - <<'PY' >/dev/null 2>&1
+import torch, sys
+sys.exit(0 if torch.cuda.is_available() else 2)
+PY
+        if [[ $? -ne 0 ]]; then
+            log "ERROR" "Torch cannot see a CUDA GPU. Check container GPU flags/env (CUDA_VISIBLE_DEVICES/NVIDIA_VISIBLE_DEVICES) and restart."
+            exit 1
+        fi
+    else
+        log "WARN" "nvidia-smi not found; continuing (CPU-only?)."
+    fi
 }
 
 # Setup model directories (RunPod volume handles persistence)
@@ -368,12 +390,7 @@ start_comfyui() {
     
     # Change to ComfyUI directory
     cd "$COMFYUI_ROOT"
-    
-    # Set up CUDA environment if available
-    if command -v nvidia-smi &> /dev/null; then
-        export CUDA_VISIBLE_DEVICES=0
-        log "INFO" "  • CUDA device set to: $CUDA_VISIBLE_DEVICES"
-    fi
+    # CUDA env already set globally in env defaults
     
     # Comprehensive health summary before starting ComfyUI
     log "INFO" "📊 Health Summary:"
@@ -431,6 +448,7 @@ main() {
     setup_storage
     download_models
     start_filebrowser
+    cuda_preflight
     start_comfyui
 }
 
