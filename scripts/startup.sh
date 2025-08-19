@@ -36,7 +36,7 @@ log() {
             ;;
         "DEBUG")
             if [[ "$DEBUG_MODE" == "true" ]]; then
-                echo -e "${BLUE}[DEBUG]${NC} $message" | tee -a "$LOG_FILE" >&2
+                echo -e "${BLUE}[DEBUG]${NC} $message" | tee -a "$LOG_FILE"
             fi
             ;;
         *)
@@ -134,90 +134,95 @@ setup_storage() {
 
 # File-level model presence checking
 check_downloads_needed() {
-    log "DEBUG" "check_downloads_needed() function started"
-    
-    local civitai_needed=false
-    local hf_needed=false
-    
-    log "INFO" "  • Performing file-level model availability check..."
-    log "INFO" "  • Using models directory: $COMFYUI_MODELS_DIR"
-    log "DEBUG" "  • FORCE_MODEL_SYNC current value: $FORCE_MODEL_SYNC"
-    log "DEBUG" "  • CIVITAI_MODELS current value: $CIVITAI_MODELS"
-    log "DEBUG" "  • HUGGINGFACE_MODELS current value: $HUGGINGFACE_MODELS"
-    
-    # Define essential FLUX model files that must be present
-    local must_have=(
-        "checkpoints/flux1-dev.safetensors"
-        "checkpoints/ae.safetensors" 
-        "checkpoints/transformer/diffusion_pytorch_model.safetensors"
-        "checkpoints/text_encoder/model.safetensors"
-        "checkpoints/text_encoder_2/model.safetensors"
-        "checkpoints/vae/diffusion_pytorch_model.safetensors"
-        "checkpoints/tokenizer/tokenizer_config.json"
-        "checkpoints/scheduler/scheduler_config.json"
-    )
-    
-    log "DEBUG" "  • Checking ${#must_have[@]} essential files for presence"
-    
-    # Check if we need sync based on missing files
-    local need_sync=false
-    local missing_files=0
-    local present_files=0
-    
-    for file in "${must_have[@]}"; do
-        local full_path="$COMFYUI_MODELS_DIR/$file"
-        log "DEBUG" "    → Checking: $full_path"
-        if [[ -f "$full_path" ]]; then
-            ((present_files++))
-            log "DEBUG" "      ✓ Present"
-        else
-            ((missing_files++))
+    # Redirect all output to stderr to prevent contaminating return value
+    {
+        log "DEBUG" "check_downloads_needed() function started"
+        
+        local civitai_needed=false
+        local hf_needed=false
+        
+        log "INFO" "  • Performing file-level model availability check..."
+        log "INFO" "  • Using models directory: $COMFYUI_MODELS_DIR"
+        log "DEBUG" "  • FORCE_MODEL_SYNC current value: $FORCE_MODEL_SYNC"
+        log "DEBUG" "  • CIVITAI_MODELS current value: $CIVITAI_MODELS"
+        log "DEBUG" "  • HUGGINGFACE_MODELS current value: $HUGGINGFACE_MODELS"
+        
+        # Define essential FLUX model files that must be present
+        local must_have=(
+            "checkpoints/flux1-dev.safetensors"
+            "checkpoints/ae.safetensors" 
+            "checkpoints/transformer/diffusion_pytorch_model.safetensors"
+            "checkpoints/text_encoder/model.safetensors"
+            "checkpoints/text_encoder_2/model.safetensors"
+            "checkpoints/vae/diffusion_pytorch_model.safetensors"
+            "checkpoints/tokenizer/tokenizer_config.json"
+            "checkpoints/scheduler/scheduler_config.json"
+        )
+        
+        log "DEBUG" "  • Checking ${#must_have[@]} essential files for presence"
+        
+        # Check if we need sync based on missing files
+        local need_sync=false
+        local missing_files=0
+        local present_files=0
+        
+        for file in "${must_have[@]}"; do
+            local full_path="$COMFYUI_MODELS_DIR/$file"
+            log "DEBUG" "    → Checking: $full_path"
+            if [[ -f "$full_path" ]]; then
+                ((present_files++))
+                log "DEBUG" "      ✓ Present"
+            else
+                ((missing_files++))
+                need_sync=true
+                log "INFO" "    → Missing: $file"
+                log "DEBUG" "      ✗ Missing (need_sync=true)"
+            fi
+        done
+        
+        log "INFO" "  • Essential files: $present_files present, $missing_files missing"
+        log "DEBUG" "  • need_sync after file check: $need_sync"
+        
+        # Force sync if environment variable is set
+        if [[ "$FORCE_MODEL_SYNC" == "true" ]]; then
             need_sync=true
-            log "INFO" "    → Missing: $file"
-            log "DEBUG" "      ✗ Missing (need_sync=true)"
+            log "INFO" "  • FORCE_MODEL_SYNC=true - forcing download"
+            log "DEBUG" "  • need_sync set to true by FORCE_MODEL_SYNC"
+        else
+            log "DEBUG" "  • FORCE_MODEL_SYNC is not 'true', no forced sync"
         fi
-    done
+        
+        log "DEBUG" "  • Final need_sync value: $need_sync"
+        
+        # Check for any additional models from CivitAI
+        if [[ -n "$CIVITAI_MODELS" && "$need_sync" == "true" ]]; then
+            civitai_needed=true
+            log "INFO" "  • Will download CivitAI models: $CIVITAI_MODELS"
+            log "DEBUG" "  • civitai_needed set to true"
+        else
+            log "DEBUG" "  • CivitAI check: CIVITAI_MODELS='$CIVITAI_MODELS', need_sync='$need_sync' -> civitai_needed=false"
+        fi
+        
+        # Check for HuggingFace models
+        if [[ -n "$HUGGINGFACE_MODELS" && "$need_sync" == "true" ]]; then
+            hf_needed=true
+            log "INFO" "  • Will download HuggingFace models: $HUGGINGFACE_MODELS"
+            log "DEBUG" "  • hf_needed set to true"
+        else
+            log "DEBUG" "  • HuggingFace check: HUGGINGFACE_MODELS='$HUGGINGFACE_MODELS', need_sync='$need_sync' -> hf_needed=false"
+        fi
+        
+        if [[ "$need_sync" == "false" ]]; then
+            log "INFO" "  ✅ All essential models present - skipping downloads"
+            log "DEBUG" "  • No downloads needed"
+        else
+            log "DEBUG" "  • Downloads needed: civitai_needed=$civitai_needed, hf_needed=$hf_needed"
+        fi
     
-    log "INFO" "  • Essential files: $present_files present, $missing_files missing"
-    log "DEBUG" "  • need_sync after file check: $need_sync"
+        log "DEBUG" "check_downloads_needed() function returning: '$civitai_needed $hf_needed'"
+    } >&2
     
-    # Force sync if environment variable is set
-    if [[ "$FORCE_MODEL_SYNC" == "true" ]]; then
-        need_sync=true
-        log "INFO" "  • FORCE_MODEL_SYNC=true - forcing download"
-        log "DEBUG" "  • need_sync set to true by FORCE_MODEL_SYNC"
-    else
-        log "DEBUG" "  • FORCE_MODEL_SYNC is not 'true', no forced sync"
-    fi
-    
-    log "DEBUG" "  • Final need_sync value: $need_sync"
-    
-    # Check for any additional models from CivitAI
-    if [[ -n "$CIVITAI_MODELS" && "$need_sync" == "true" ]]; then
-        civitai_needed=true
-        log "INFO" "  • Will download CivitAI models: $CIVITAI_MODELS"
-        log "DEBUG" "  • civitai_needed set to true"
-    else
-        log "DEBUG" "  • CivitAI check: CIVITAI_MODELS='$CIVITAI_MODELS', need_sync='$need_sync' -> civitai_needed=false"
-    fi
-    
-    # Check for HuggingFace models
-    if [[ -n "$HUGGINGFACE_MODELS" && "$need_sync" == "true" ]]; then
-        hf_needed=true
-        log "INFO" "  • Will download HuggingFace models: $HUGGINGFACE_MODELS"
-        log "DEBUG" "  • hf_needed set to true"
-    else
-        log "DEBUG" "  • HuggingFace check: HUGGINGFACE_MODELS='$HUGGINGFACE_MODELS', need_sync='$need_sync' -> hf_needed=false"
-    fi
-    
-    if [[ "$need_sync" == "false" ]]; then
-        log "INFO" "  ✅ All essential models present - skipping downloads"
-        log "DEBUG" "  • No downloads needed"
-    else
-        log "DEBUG" "  • Downloads needed: civitai_needed=$civitai_needed, hf_needed=$hf_needed"
-    fi
-    
-    log "DEBUG" "check_downloads_needed() function returning: '$civitai_needed $hf_needed'"
+    # Return clean values to stdout only
     echo "$civitai_needed $hf_needed"
 }
 
