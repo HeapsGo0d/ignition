@@ -43,14 +43,18 @@ log() {
     esac
 }
 
-# Environment variable defaults
+# Environment variable defaults - Single source of truth
 export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
-export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
-export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
+export FILEBROWSER_DB="$WORKSPACE_ROOT/.filebrowser/filebrowser.db"
+export FILEBROWSER_USER="admin"
+export FILEBROWSER_PASS="${FILEBROWSER_PASSWORD:-}"
+export FILEBROWSER_MINPASS="12"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
+export COMFYUI_MODELS_DIR="$WORKSPACE_ROOT/ComfyUI/models"
+export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 
 # Health marker file to track successful boots
@@ -113,75 +117,75 @@ check_system() {
 setup_storage() {
     log "INFO" "💾 Setting up model directories..."
     
-    # Ensure model directories exist in /workspace/ComfyUI/models/
+    # Ensure model directories exist using COMFYUI_MODELS_DIR
+    mkdir -p "$COMFYUI_MODELS_DIR"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models}
+    
     for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
-        model_dir="$COMFYUI_ROOT/models/$model_type"
-        mkdir -p "$model_dir"
-        log "INFO" "  • Created $model_type directory"
+        model_dir="$COMFYUI_MODELS_DIR/$model_type"
+        log "INFO" "  • Created $model_type directory: $model_dir"
     done
     
-    log "INFO" "✅ Model directories ready"
+    log "INFO" "✅ Model directories ready at: $COMFYUI_MODELS_DIR"
     log "INFO" ""
 }
 
-# Check if downloads are needed by scanning existing models
+# File-level model presence checking
 check_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
     
-    # Remove broken health marker logic temporarily to force actual downloads
-    if [[ -f "$HEALTH_MARKER_FILE" ]]; then
-        log "INFO" "  • Health marker found but ignoring for debugging - forcing model check"
-    fi
+    log "INFO" "  • Performing file-level model availability check..."
+    log "INFO" "  • Using models directory: $COMFYUI_MODELS_DIR"
     
-    log "INFO" "  • Performing detailed model availability check..."
+    # Define essential FLUX model files that must be present
+    local must_have=(
+        "checkpoints/flux1-dev.safetensors"
+        "checkpoints/ae.safetensors" 
+        "checkpoints/transformer/diffusion_pytorch_model.safetensors"
+        "checkpoints/text_encoder/model.safetensors"
+        "checkpoints/text_encoder_2/model.safetensors"
+        "checkpoints/vae/diffusion_pytorch_model.safetensors"
+        "checkpoints/tokenizer/tokenizer_config.json"
+        "checkpoints/scheduler/scheduler_config.json"
+    )
     
-    # Debug: Show where we're looking and what's actually there
-    log "INFO" "  • Searching in: $COMFYUI_ROOT/models/"
-    local all_files=$(find "$COMFYUI_ROOT/models" -type f 2>/dev/null | wc -l)
-    log "INFO" "  • Total files in models directory: $all_files"
+    # Check if we need sync based on missing files
+    local need_sync=false
+    local missing_files=0
+    local present_files=0
     
-    # List some files if they exist
-    if (( all_files > 0 )); then
-        log "INFO" "  • Sample files found:"
-        find "$COMFYUI_ROOT/models" -type f 2>/dev/null | head -3 | while read file; do
-            log "INFO" "    → $file"
-        done
-    fi
-    
-    # Quick check for existing models to avoid redundant downloads
-    if [[ -n "$CIVITAI_MODELS" ]]; then
-        # Count existing models in common directories
-        local checkpoint_count=$(find "$COMFYUI_ROOT/models/checkpoints" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | wc -l)
-        local lora_count=$(find "$COMFYUI_ROOT/models/loras" -name "*.safetensors" -o -name "*.pt" 2>/dev/null | wc -l)
-        local vae_count=$(find "$COMFYUI_ROOT/models/vae" -name "*.safetensors" -o -name "*.pt" 2>/dev/null | wc -l)
-        
-        local total_models=$((checkpoint_count + lora_count + vae_count))
-        local civitai_model_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
-        
-        log "INFO" "  • checkpoints: $checkpoint_count, loras: $lora_count, vae: $vae_count"
-        
-        # Force download if no models found
-        if (( total_models == 0 )); then
-            civitai_needed=true
-            log "INFO" "  • No models found - will download $civitai_model_count from CivitAI"
+    for file in "${must_have[@]}"; do
+        if [[ -f "$COMFYUI_MODELS_DIR/$file" ]]; then
+            ((present_files++))
         else
-            log "INFO" "  • Found $total_models existing models, expecting $civitai_model_count from CivitAI"
+            ((missing_files++))
+            need_sync=true
+            log "INFO" "    → Missing: $file"
         fi
+    done
+    
+    log "INFO" "  • Essential files: $present_files present, $missing_files missing"
+    
+    # Force sync if environment variable is set
+    if [[ "$FORCE_MODEL_SYNC" == "true" ]]; then
+        need_sync=true
+        log "INFO" "  • FORCE_MODEL_SYNC=true - forcing download"
     fi
     
-    if [[ -n "$HUGGINGFACE_MODELS" ]]; then
-        # Check for HuggingFace models (typically in checkpoints)
-        local hf_checkpoint_count=$(find "$COMFYUI_ROOT/models/checkpoints" -name "*flux*" -o -name "*FLUX*" 2>/dev/null | wc -l)
-        local hf_model_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
-        
-        # Force download if no HF models found  
-        if (( hf_checkpoint_count == 0 )); then
-            hf_needed=true
-            log "INFO" "  • No HF models found - will download $hf_model_count from HuggingFace"
-        else
-            log "INFO" "  • Found $hf_checkpoint_count existing HF models, expecting $hf_model_count"
-        fi
+    # Check for any additional models from CivitAI
+    if [[ -n "$CIVITAI_MODELS" && "$need_sync" == "true" ]]; then
+        civitai_needed=true
+        log "INFO" "  • Will download CivitAI models: $CIVITAI_MODELS"
+    fi
+    
+    # Check for HuggingFace models
+    if [[ -n "$HUGGINGFACE_MODELS" && "$need_sync" == "true" ]]; then
+        hf_needed=true
+        log "INFO" "  • Will download HuggingFace models: $HUGGINGFACE_MODELS"
+    fi
+    
+    if [[ "$need_sync" == "false" ]]; then
+        log "INFO" "  ✅ All essential models present - skipping downloads"
     fi
     
     echo "$civitai_needed $hf_needed"
@@ -254,6 +258,12 @@ download_models() {
         log "INFO" "ℹ️  All models already present, skipping downloads"
     fi
     
+    # Fix model permissions after downloads
+    log "INFO" "🔧 Setting model permissions..."
+    chown -R "$(id -u)":"$(id -g)" "$COMFYUI_MODELS_DIR" 2>/dev/null || true
+    chmod -R u+rwX,go+rX "$COMFYUI_MODELS_DIR" 2>/dev/null || true
+    log "INFO" "✅ Model permissions updated"
+    
     log "INFO" ""
 }
 
@@ -261,53 +271,52 @@ download_models() {
 start_filebrowser() {
     log "INFO" "📁 Starting file browser..."
     
-    # Create filebrowser config in persistent storage
-    local config_dir="$WORKSPACE_ROOT/.filebrowser"
-    local db_path="$config_dir/filebrowser.db"
-    mkdir -p "$config_dir"
+    # Create filebrowser config directory
+    mkdir -p "$(dirname "$FILEBROWSER_DB")"
     
-    # Initialize filebrowser database with user (only if doesn't exist)
-    if [[ ! -f "$db_path" ]]; then
+    # Initialize filebrowser database if it doesn't exist
+    if [[ ! -f "$FILEBROWSER_DB" ]]; then
         log "INFO" "  • Initializing filebrowser database..."
-        # First initialize the config
-        filebrowser -d "$db_path" config init
         
-        # Ensure password meets minimum requirements (12+ chars)
-        local fb_password="$FILEBROWSER_PASSWORD"
-        if [[ ${#fb_password} -lt 12 ]]; then
-            fb_password="ignition_${FILEBROWSER_PASSWORD}_2024"
-            log "INFO" "  • Password too short, using: $fb_password"
+        # Initialize config
+        filebrowser config init --database "$FILEBROWSER_DB"
+        
+        # Set configuration policies
+        filebrowser config set \
+            --database "$FILEBROWSER_DB" \
+            --auth.method json \
+            --signup false \
+            --root /workspace \
+            --address 0.0.0.0 \
+            --port "$FILEBROWSER_PORT"
+        
+        # Generate secure password if not provided
+        if [[ -z "$FILEBROWSER_PASS" || ${#FILEBROWSER_PASS} -lt $FILEBROWSER_MINPASS ]]; then
+            FILEBROWSER_PASS="ignition_$(date +%s)_secure"
+            log "INFO" "  • Generated secure password: $FILEBROWSER_PASS"
         fi
         
-        # Set minimum password length policy
-        filebrowser -d "$db_path" config set --auth.method=json --auth.header=""
+        # Create admin user
+        filebrowser users add "$FILEBROWSER_USER" "$FILEBROWSER_PASS" \
+            --perm.admin --database "$FILEBROWSER_DB" || {
+            log "ERROR" "Failed to create filebrowser user"
+            exit 1
+        }
         
-        # Then add the admin user with proper password
-        filebrowser -d "$db_path" users add admin "$fb_password" --perm.admin
-        
-        log "INFO" "  • Admin user created with password: $fb_password"
+        log "INFO" "  • Admin user created successfully"
     fi
     
-    # Start filebrowser in background (using Hearmeman's approach with explicit params)
-    log "INFO" "  • Starting filebrowser with root: $WORKSPACE_ROOT"
+    # Start filebrowser without relying on CWD
+    log "INFO" "  • Starting filebrowser at /workspace:$FILEBROWSER_PORT"
     filebrowser \
-        --database "$db_path" \
-        --root "$WORKSPACE_ROOT" \
-        --address "0.0.0.0" \
+        --database "$FILEBROWSER_DB" \
+        --address 0.0.0.0 \
         --port "$FILEBROWSER_PORT" \
-        --log "$config_dir/filebrowser.log" &
+        --root /workspace &
     
     local fb_pid=$!
-    
-    # Show the actual password being used (handle extended password case)
-    local display_password="$FILEBROWSER_PASSWORD"
-    if [[ ${#FILEBROWSER_PASSWORD} -lt 12 ]]; then
-        display_password="ignition_${FILEBROWSER_PASSWORD}_2024"
-    fi
-    
-    log "INFO" "  • File browser started on port $FILEBROWSER_PORT (PID: $fb_pid)"
-    log "INFO" "  • Username: admin"
-    log "INFO" "  • Password: $display_password"
+    log "INFO" "  • File browser started (PID: $fb_pid)"
+    log "INFO" "  • Login: $FILEBROWSER_USER / $FILEBROWSER_PASS"
     log "INFO" ""
 }
 
@@ -324,39 +333,34 @@ start_comfyui() {
         log "INFO" "  • CUDA device set to: $CUDA_VISIBLE_DEVICES"
     fi
     
-    # Set explicit ComfyUI model paths
-    export COMFYUI_MODEL_PATH="$COMFYUI_ROOT/models"
+    # Comprehensive health summary before starting ComfyUI
+    log "INFO" "📊 Health Summary:"
+    log "INFO" "  • Mount: $(df -h /workspace | tail -1 | awk '{print $4 " available"}')"
+    log "INFO" "  • Models: $(find "$COMFYUI_MODELS_DIR" -type f 2>/dev/null | wc -l) files in $COMFYUI_MODELS_DIR"
     
-    # Ensure all model directories exist with proper permissions
+    # Show model counts per directory
     for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
-        local model_dir="$COMFYUI_ROOT/models/$model_type"
-        mkdir -p "$model_dir"
-        chmod 755 "$model_dir"
-        chown -R $(whoami):$(whoami) "$model_dir" 2>/dev/null || true
-        
+        local model_dir="$COMFYUI_MODELS_DIR/$model_type"
         if [[ -d "$model_dir" ]]; then
-            local count=$(find "$model_dir" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.pth" -o -name "*.bin" 2>/dev/null | wc -l)
-            log "INFO" "  • $model_type: $count models ($(du -sh "$model_dir" 2>/dev/null | cut -f1 || echo "0B"))"
-            
-            # List first few models for verification
-            if [[ $count -gt 0 ]]; then
-                local first_models=$(find "$model_dir" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | head -2 | xargs -I {} basename {})
-                if [[ -n "$first_models" ]]; then
-                    log "INFO" "    → Sample files: $first_models"
-                fi
-            fi
+            local count=$(find "$model_dir" -type f 2>/dev/null | wc -l)
+            local size=$(du -sh "$model_dir" 2>/dev/null | cut -f1 || echo "0B")
+            log "INFO" "    → $model_type: $count files ($size)"
         fi
     done
     
-    log "INFO" "  • Starting ComfyUI server on port $COMFYUI_PORT..."
+    # Export model path for ComfyUI
+    export COMFYUI_MODELS_DIR
+    
+    log "INFO" "  • Starting ComfyUI server on port $COMFYUI_PORT with models at $COMFYUI_MODELS_DIR"
     log "INFO" ""
     
     # Create health marker to indicate successful startup
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
     log "INFO" "✅ Health marker created - future restarts will be faster"
     
-    # Start ComfyUI (this will run in foreground)
-    exec python3 main.py \
+    # Change to ComfyUI directory and start with explicit model path
+    cd "$COMFYUI_ROOT"
+    exec python -u main.py \
         --listen "0.0.0.0" \
         --port "$COMFYUI_PORT" \
         --cuda-device 0

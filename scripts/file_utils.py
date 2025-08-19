@@ -21,19 +21,20 @@ class AtomicFileHandler:
     
     def __init__(self, workspace_root: str = "/workspace"):
         self.workspace_root = Path(workspace_root)
-        self.comfyui_root = self.workspace_root / "ComfyUI"
+        # Use environment variable for consistent path
+        models_dir = Path(os.environ.get('COMFYUI_MODELS_DIR', '/workspace/ComfyUI/models'))
         self.temp_dir = Path(tempfile.gettempdir()) / "ignition_downloads"
         self.temp_dir.mkdir(exist_ok=True)
         
-        # Model type to directory mapping
+        # Model type to directory mapping - aligned with ComfyUI expectations
         self.model_dirs = {
-            'checkpoint': self.comfyui_root / 'models' / 'checkpoints',
-            'model': self.comfyui_root / 'models' / 'checkpoints',
-            'lora': self.comfyui_root / 'models' / 'loras',
-            'vae': self.comfyui_root / 'models' / 'vae',
-            'embedding': self.comfyui_root / 'models' / 'embeddings',
-            'controlnet': self.comfyui_root / 'models' / 'controlnet',
-            'upscaler': self.comfyui_root / 'models' / 'upscale_models',
+            'checkpoint': models_dir / 'checkpoints',
+            'model': models_dir / 'checkpoints',
+            'lora': models_dir / 'loras',
+            'vae': models_dir / 'vae',
+            'embedding': models_dir / 'embeddings',
+            'controlnet': models_dir / 'controlnet',
+            'upscaler': models_dir / 'upscale_models',
         }
         
         # Ensure all directories exist
