@@ -129,19 +129,9 @@ check_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
     
-    # If health marker exists and force sync is not enabled, do quick check but trust previous success
-    if [[ -f "$HEALTH_MARKER_FILE" && "$FORCE_MODEL_SYNC" != "true" ]]; then
-        log "INFO" "  • Health marker found - doing quick model count verification"
-        # Quick count check - if models exist, trust health marker
-        local total_files=$(find "$COMFYUI_ROOT/models" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" 2>/dev/null | wc -l)
-        if (( total_files > 0 )); then
-            log "INFO" "  • Found $total_files model files - trusting previous successful boot"
-            log "INFO" "  • Use FORCE_MODEL_SYNC=true to override and re-download"
-            echo "false false"
-            return
-        else
-            log "INFO" "  • No model files found despite health marker - will re-download"
-        fi
+    # Remove broken health marker logic temporarily to force actual downloads
+    if [[ -f "$HEALTH_MARKER_FILE" ]]; then
+        log "INFO" "  • Health marker found but ignoring for debugging - forcing model check"
     fi
     
     log "INFO" "  • Performing detailed model availability check..."
@@ -171,11 +161,13 @@ check_downloads_needed() {
         
         log "INFO" "  • checkpoints: $checkpoint_count, loras: $lora_count, vae: $vae_count"
         
-        if (( total_models < civitai_model_count )); then
+        # Force download if no models found
+        if (( total_models == 0 )); then
             civitai_needed=true
+            log "INFO" "  • No models found - will download $civitai_model_count from CivitAI"
+        else
+            log "INFO" "  • Found $total_models existing models, expecting $civitai_model_count from CivitAI"
         fi
-        
-        log "INFO" "  • Found $total_models existing models, expecting $civitai_model_count from CivitAI"
     fi
     
     if [[ -n "$HUGGINGFACE_MODELS" ]]; then
@@ -183,11 +175,13 @@ check_downloads_needed() {
         local hf_checkpoint_count=$(find "$COMFYUI_ROOT/models/checkpoints" -name "*flux*" -o -name "*FLUX*" 2>/dev/null | wc -l)
         local hf_model_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
         
-        if (( hf_checkpoint_count < hf_model_count )); then
+        # Force download if no HF models found  
+        if (( hf_checkpoint_count == 0 )); then
             hf_needed=true
+            log "INFO" "  • No HF models found - will download $hf_model_count from HuggingFace"
+        else
+            log "INFO" "  • Found $hf_checkpoint_count existing HF models, expecting $hf_model_count"
         fi
-        
-        log "INFO" "  • Found $hf_checkpoint_count existing HF models, expecting $hf_model_count"
     fi
     
     echo "$civitai_needed $hf_needed"
@@ -294,13 +288,14 @@ start_filebrowser() {
         log "INFO" "  • Admin user created with password: $fb_password"
     fi
     
-    # Start filebrowser in background (using Hearmeman's approach)
+    # Start filebrowser in background (using Hearmeman's approach with explicit params)
+    log "INFO" "  • Starting filebrowser with root: $WORKSPACE_ROOT"
     filebrowser \
-        -d "$db_path" \
-        -r "$WORKSPACE_ROOT" \
-        -a "0.0.0.0" \
-        -p "$FILEBROWSER_PORT" \
-        > "$config_dir/filebrowser.log" 2>&1 &
+        --database "$db_path" \
+        --root "$WORKSPACE_ROOT" \
+        --address "0.0.0.0" \
+        --port "$FILEBROWSER_PORT" \
+        --log "$config_dir/filebrowser.log" &
     
     local fb_pid=$!
     
