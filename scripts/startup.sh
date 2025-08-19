@@ -59,11 +59,15 @@ export COMFYUI_MODELS_DIR="$WORKSPACE_ROOT/ComfyUI/models"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 export DEBUG_MODE="${DEBUG_MODE:-false}"
+export USE_CPU_FALLBACK="${USE_CPU_FALLBACK:-true}"  # new: allow CPU fallback if CUDA not visible
 
 # --- GPU visibility defaults (make Torch/ComfyUI see GPU 0 consistently) ---
 export NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-0}
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 export NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
+# Track CUDA health globally
+GPU_OK=true
 
 # Health marker file to track successful boots
 HEALTH_MARKER_FILE="$WORKSPACE_ROOT/.ignition_ok"
@@ -123,18 +127,36 @@ check_system() {
 
 # Ensure Python/Torch can actually see a CUDA GPU before launching ComfyUI
 cuda_preflight() {
-    if command -v nvidia-smi &>/dev/null; then
+    if command -v nvidia-smi >/dev/null 2>&1; then
         log "INFO" "🔧 Verifying CUDA visibility for Python/Torch…"
         python - <<'PY' >/dev/null 2>&1
-import torch, sys
-sys.exit(0 if torch.cuda.is_available() else 2)
+import sys
+try:
+    import torch
+    sys.exit(0 if torch.cuda.is_available() else 2)
+except Exception:
+    sys.exit(3)
 PY
-        if [[ $? -ne 0 ]]; then
-            log "ERROR" "Torch cannot see a CUDA GPU. Check container GPU flags/env (CUDA_VISIBLE_DEVICES/NVIDIA_VISIBLE_DEVICES) and restart."
-            exit 1
+        rc=$?
+        if [[ $rc -ne 0 ]]; then
+            GPU_OK=false
+            if [[ "$USE_CPU_FALLBACK" == "true" ]]; then
+                log "WARN" "Torch can't see CUDA (rc=$rc). Falling back to CPU."
+            else
+                log "ERROR" "Torch can't see CUDA and USE_CPU_FALLBACK=false. Exiting in 5s to avoid restart thrash."
+                sleep 5
+                exit 1
+            fi
         fi
     else
-        log "WARN" "nvidia-smi not found; continuing (CPU-only?)."
+        GPU_OK=false
+        if [[ "$USE_CPU_FALLBACK" == "true" ]]; then
+            log "WARN" "nvidia-smi not found. Continuing on CPU."
+        else
+            log "ERROR" "nvidia-smi not found and USE_CPU_FALLBACK=false. Exiting in 5s."
+            sleep 5
+            exit 1
+        fi
     fi
 }
 
@@ -346,6 +368,12 @@ download_models() {
 # Start file browser
 start_filebrowser() {
     log "INFO" "📁 Starting file browser..."
+
+    # If filebrowser binary is missing, don't kill the pod
+    if ! command -v filebrowser >/dev/null 2>&1; then
+        log "WARN" "filebrowser not found in PATH; skipping File Browser startup."
+        return 0
+    fi
     
     # Create filebrowser config directory
     mkdir -p "$(dirname "$FILEBROWSER_DB")"
@@ -435,13 +463,17 @@ start_comfyui() {
     # Create health marker to indicate successful startup
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
     log "INFO" "✅ Health marker created - future restarts will be faster"
-    
-    # Change to ComfyUI directory and start with explicit model path
-    cd "$COMFYUI_ROOT"
-    exec python -u main.py \
-        --listen "0.0.0.0" \
-        --port "$COMFYUI_PORT" \
-        --cuda-device 0
+
+    # Build ComfyUI args based on CUDA availability
+    local args=(--listen "0.0.0.0" --port "$COMFYUI_PORT")
+    if [[ "$GPU_OK" == "true" ]]; then
+        args+=(--cuda-device 0)
+    else
+        args+=(--cpu)
+    fi
+
+    # Become PID 1
+    exec python -u main.py "${args[@]}"
 }
 
 # Cleanup function for graceful shutdown
@@ -466,8 +498,8 @@ main() {
     check_system
     setup_storage
     download_models
+    cuda_preflight           # moved before File Browser to fail/decide early
     start_filebrowser
-    cuda_preflight
     start_comfyui
 }
 
