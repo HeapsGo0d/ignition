@@ -2,7 +2,7 @@
 # Ignition Startup Script
 # Orchestrates model downloads and ComfyUI startup for RunPod
 
-set -e  # Exit on any error
+set -euo pipefail  # safer bash: exit on error/undef; fail on pipe errors
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -169,13 +169,22 @@ check_downloads_needed() {
         log "DEBUG" "  • CIVITAI_MODELS current value: $CIVITAI_MODELS"
         log "DEBUG" "  • HUGGINGFACE_MODELS current value: $HUGGINGFACE_MODELS"
         
-        # Define essential FLUX model files that must be present
+        # Essential FLUX.1-dev files (use shard names that actually exist)
         local must_have=(
             "checkpoints/flux1-dev.safetensors"
-            "checkpoints/ae.safetensors" 
-            "checkpoints/transformer/diffusion_pytorch_model.safetensors"
+            "checkpoints/ae.safetensors"
+            # transformer shards + index
+            "checkpoints/transformer/diffusion_pytorch_model-00001-of-00003.safetensors"
+            "checkpoints/transformer/diffusion_pytorch_model-00002-of-00003.safetensors"
+            "checkpoints/transformer/diffusion_pytorch_model-00003-of-00003.safetensors"
+            "checkpoints/transformer/diffusion_pytorch_model.safetensors.index.json"
+            # text encoder 1 (single file)
             "checkpoints/text_encoder/model.safetensors"
-            "checkpoints/text_encoder_2/model.safetensors"
+            # text encoder 2 shards + index
+            "checkpoints/text_encoder_2/model-00001-of-00002.safetensors"
+            "checkpoints/text_encoder_2/model-00002-of-00002.safetensors"
+            "checkpoints/text_encoder_2/model.safetensors.index.json"
+            # vae + basic configs
             "checkpoints/vae/diffusion_pytorch_model.safetensors"
             "checkpoints/tokenizer/tokenizer_config.json"
             "checkpoints/scheduler/scheduler_config.json"
@@ -187,6 +196,7 @@ check_downloads_needed() {
         local need_sync=false
         local missing_files=0
         local present_files=0
+        local missing_list=()
         
         for file in "${must_have[@]}"; do
             local full_path="$COMFYUI_MODELS_DIR/$file"
@@ -197,6 +207,7 @@ check_downloads_needed() {
             else
                 ((missing_files++))
                 need_sync=true
+                missing_list+=("$file")
                 log "INFO" "    → Missing: $file"
                 log "DEBUG" "      ✗ Missing (need_sync=true)"
             fi
@@ -204,6 +215,14 @@ check_downloads_needed() {
         
         log "INFO" "  • Essential files: $present_files present, $missing_files missing"
         log "DEBUG" "  • need_sync after file check: $need_sync"
+        
+        # Log missing files summary for debugging
+        if [[ $missing_files -gt 0 ]]; then
+            log "DEBUG" "  • Missing files that triggered download:"
+            for missing_file in "${missing_list[@]}"; do
+                log "DEBUG" "    - $missing_file"
+            done
+        fi
         
         # Force sync if environment variable is set
         if [[ "$FORCE_MODEL_SYNC" == "true" ]]; then
