@@ -25,10 +25,30 @@ jobs:
         dotnet: true
         # Remove Haskell (saves ~2.7 GB)
         haskell: true
-        # Keep large packages that might be needed
-        large-packages: false
-        # Remove Docker images (saves space but we need Docker)
-        docker-images: false
+        # Remove large packages (saves additional space)
+        large-packages: true
+        # Remove Docker images (we'll rebuild anyway)
+        docker-images: true
+        
+    - name: Additional disk cleanup
+      run: |
+        echo "Disk space before cleanup:"
+        df -h
+        
+        # Remove more unnecessary packages
+        sudo apt-get remove -y '^ghc-*' '^dotnet-*' '^llvm-*' '^php.*' '^mongodb-*' '^mysql-*' '^postgresql-*' || true
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean
+        
+        # Clear various caches
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        
+        echo "Disk space after cleanup:"
+        df -h
         
     - name: Checkout repository
       uses: actions/checkout@v4
