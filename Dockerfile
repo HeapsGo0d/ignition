@@ -1,8 +1,8 @@
 # Ignition - ComfyUI with Dynamic Model Loading
 # Optimized for RTX 5090 and RunPod deployment
-# Using NVIDIA CUDA 12.8.1 with PyTorch nightly for RTX 5090 (sm_120) support
+# Start with PyTorch base and upgrade for RTX 5090 support
 
-FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -13,28 +13,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies and Python 3.11 (exact copy of Hearmeman's approach)
-RUN apt-get update && \
-    apt-get install -y software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3.11-dev \
-    python3-pip \
-    curl wget git vim ffmpeg aria2 git-lfs \
-    libgl1-mesa-glx libglib2.0-0 && \
-    ln -sf /usr/bin/python3.11 /usr/bin/python && \
-    ln -sf /usr/bin/pip3 /usr/bin/pip && \
-    python3.11 -m venv /opt/venv && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ffmpeg git aria2 git-lfs wget vim \
+    libgl1-mesa-glx libglib2.0-0 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Activate virtual environment for all subsequent RUN commands
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install PyTorch nightly with CUDA 12.8 support for RTX 5090 (sm_120)
+# Upgrade PyTorch to nightly for RTX 5090 support
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install packaging setuptools wheel && \
-    pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+    pip uninstall -y torch torchvision torchaudio && \
+    pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
 
 # Runtime libraries and RTX 5090 optimizations
 RUN --mount=type=cache,target=/root/.cache/pip \
