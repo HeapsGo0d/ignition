@@ -13,13 +13,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install Python 3.11 and system dependencies
+# Install Python (using Ubuntu 24.04 default) and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-dev python3.11-venv python3-pip \
+    python3 python3-dev python3-venv python3-pip \
     curl ffmpeg git aria2 git-lfs wget vim \
     libgl1-mesa-glx libglib2.0-0 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PyTorch nightly with CUDA 12.8 support for RTX 5090 (sm_120)
