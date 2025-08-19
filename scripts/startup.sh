@@ -215,8 +215,6 @@ download_models() {
         civitai_pid=$!
         download_processes+=($civitai_pid)
         log "INFO" "  • CivitAI download started (PID: $civitai_pid)"
-    elif [[ -n "$CIVITAI_MODELS" ]]; then
-        log "INFO" "✅ CivitAI models already present, skipping download"
     fi
     
     # Download HuggingFace models only if needed
@@ -231,8 +229,6 @@ download_models() {
         hf_pid=$!
         download_processes+=($hf_pid)
         log "INFO" "  • HuggingFace download started (PID: $hf_pid)"
-    elif [[ -n "$HUGGINGFACE_MODELS" ]]; then
-        log "INFO" "✅ HuggingFace models already present, skipping download"
     fi
     
     # Wait for all downloads to complete if any were started
@@ -254,8 +250,6 @@ download_models() {
         else
             log "WARN" "⚠️  Some model downloads failed, but continuing with startup"
         fi
-    else
-        log "INFO" "ℹ️  All models already present, skipping downloads"
     fi
     
     # Fix model permissions after downloads
@@ -284,11 +278,11 @@ start_filebrowser() {
         # Set configuration policies
         filebrowser config set \
             --database "$FILEBROWSER_DB" \
-            --auth.method json \
-            --signup false \
-            --root /workspace \
-            --address 0.0.0.0 \
-            --port "$FILEBROWSER_PORT"
+            --auth.method=json \
+            --signup=false \
+            --root=/workspace \
+            --address=0.0.0.0 \
+            --port="$FILEBROWSER_PORT"
         
         # Generate secure password if not provided
         if [[ -z "$FILEBROWSER_PASS" || ${#FILEBROWSER_PASS} -lt $FILEBROWSER_MINPASS ]]; then
@@ -315,8 +309,15 @@ start_filebrowser() {
         --root /workspace &
     
     local fb_pid=$!
+    
+    # Show current filebrowser password (might have been generated)
+    local current_password="$FILEBROWSER_PASS"
+    if [[ -z "$current_password" || ${#current_password} -lt $FILEBROWSER_MINPASS ]]; then
+        current_password="[Generated during DB init - check logs above]"
+    fi
+    
     log "INFO" "  • File browser started (PID: $fb_pid)"
-    log "INFO" "  • Login: $FILEBROWSER_USER / $FILEBROWSER_PASS"
+    log "INFO" "  • Login: $FILEBROWSER_USER / $current_password"
     log "INFO" ""
 }
 
