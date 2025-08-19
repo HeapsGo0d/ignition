@@ -62,6 +62,11 @@
       "key": "FILEBROWSER_PORT",
       "value": "8080", 
       "description": "File browser port"
+    },
+    {
+      "key": "FORCE_MODEL_SYNC",
+      "value": "false",
+      "description": "Force model downloads even if files detected (true/false)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"

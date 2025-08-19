@@ -377,7 +377,8 @@ deploy_template() {
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
-    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
+    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
+    {"key": "FORCE_MODEL_SYNC", "value": "false"}
   ]
 }
 EOF
