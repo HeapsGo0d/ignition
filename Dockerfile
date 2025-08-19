@@ -13,13 +13,23 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install Python (using Ubuntu 24.04 default) and system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-dev python3-venv python3-pip \
-    curl ffmpeg git aria2 git-lfs wget vim \
-    libgl1-mesa-glx libglib2.0-0 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies and Python 3.11 (exact copy of Hearmeman's approach)
+RUN apt-get update && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3.11-dev \
+    python3-pip \
+    curl wget git vim ffmpeg aria2 git-lfs \
+    libgl1-mesa-glx libglib2.0-0 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip && \
+    python3.11 -m venv /opt/venv && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Activate virtual environment for all subsequent RUN commands
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Install PyTorch nightly with CUDA 12.8 support for RTX 5090 (sm_120)
 RUN --mount=type=cache,target=/root/.cache/pip \
