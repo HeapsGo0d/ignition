@@ -122,19 +122,26 @@ class CivitAIDownloader:
                 
                 total_size = expected_size or int(response.headers.get('content-length', 0))
                 downloaded_size = 0
-                
+                last_logged = 0
+                log_interval = 100 * 1024 * 1024  # 100MB
+
                 async with aiofiles.open(temp_path, 'wb') as file:
                     async for chunk in response.content.iter_chunked(8192):
                         await file.write(chunk)
                         downloaded_size += len(chunk)
-                        
-                        # Log progress every 100MB
-                        if downloaded_size % (100 * 1024 * 1024) == 0:
+
+                        # Log progress roughly every 100MB downloaded
+                        if downloaded_size - last_logged >= log_interval:
                             if total_size > 0:
                                 progress = (downloaded_size / total_size) * 100
-                                logger.info(f"Progress {filename}: {progress:.1f}% ({downloaded_size / 1024 / 1024:.1f}MB)")
+                                logger.info(
+                                    f"Progress {filename}: {progress:.1f}% ({downloaded_size / 1024 / 1024:.1f}MB)"
+                                )
                             else:
-                                logger.info(f"Downloaded {filename}: {downloaded_size / 1024 / 1024:.1f}MB")
+                                logger.info(
+                                    f"Downloaded {filename}: {downloaded_size / 1024 / 1024:.1f}MB"
+                                )
+                            last_logged = downloaded_size
                 
                 logger.info(f"Download complete: {filename} ({downloaded_size / 1024 / 1024:.1f}MB)")
                 return True
