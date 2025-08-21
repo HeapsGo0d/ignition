@@ -4,7 +4,6 @@ HuggingFace model downloader for Flux and other models.
 Supports downloading from HuggingFace repositories with parallel processing.
 """
 
-import os
 import sys
 import asyncio
 import logging
@@ -15,9 +14,7 @@ from huggingface_hub.utils import RepositoryNotFoundError, RevisionNotFoundError
 import concurrent.futures
 import threading
 
-# Add the scripts directory to path for imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from file_utils import file_handler
+from .file_utils import file_handler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
