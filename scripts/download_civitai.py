@@ -4,7 +4,6 @@ CivitAI model downloader with parallel processing.
 Supports models, LoRAs, and VAEs specified by version IDs.
 """
 
-import os
 import sys
 import asyncio
 import aiohttp
@@ -15,9 +14,7 @@ from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 import json
 
-# Add the scripts directory to path for imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from file_utils import file_handler
+from .file_utils import file_handler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
