@@ -12,7 +12,6 @@ from typing import List, Dict, Optional, Tuple
 from huggingface_hub import hf_hub_download, list_repo_files, repo_info
 from huggingface_hub.utils import RepositoryNotFoundError, RevisionNotFoundError
 import concurrent.futures
-import threading
 
 from .file_utils import file_handler
 
