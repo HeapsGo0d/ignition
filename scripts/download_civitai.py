@@ -11,8 +11,6 @@ import aiofiles
 import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
-from urllib.parse import urlparse
-import json
 
 from .file_utils import file_handler
 

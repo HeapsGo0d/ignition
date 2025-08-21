@@ -10,7 +10,7 @@ import tempfile
 import hashlib
 import logging
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
