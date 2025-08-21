@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 HuggingFace model downloader for Flux and other models.
-Supports downloading from HuggingFace repositories with parallel processing.
+Supports downloading from HuggingFace repositories.
 """
 
 import sys
@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from huggingface_hub import hf_hub_download, list_repo_files, repo_info
 from huggingface_hub.utils import RepositoryNotFoundError, RevisionNotFoundError
-import concurrent.futures
 
 from .file_utils import file_handler
 
@@ -20,11 +19,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class HuggingFaceDownloader:
-    """Handles downloading models from HuggingFace with parallel processing."""
+    """Handles downloading models from HuggingFace."""
     
     def __init__(self, token: Optional[str] = None):
         self.token = token
-        self.concurrent_downloads = 2  # Conservative limit for HF downloads
         
         # File extensions to download for different model types
         self.model_extensions = {
@@ -138,49 +136,25 @@ class HuggingFaceDownloader:
         """Get list of files in repository with their sizes."""
         try:
             logger.info(f"Fetching file list for repository: {repo_id}")
-            
-            # Run in thread pool since HF Hub is synchronous
-            loop = asyncio.get_event_loop()
-            
-            def _get_files():
-                try:
-                    # Get repository info
-                    info = repo_info(repo_id, token=self.token)
-                    
-                    # List all files in the repository
-                    files = list_repo_files(repo_id, token=self.token)
-                    
-                    # Get file sizes from the repository info if available
-                    file_info = []
-                    for filename in files:
-                        file_data = {'filename': filename, 'size': None}
-                        
-                        # Try to get size from repo info
-                        for sibling in info.siblings:
-                            if sibling.rfilename == filename:
-                                file_data['size'] = sibling.size
-                                break
-                        
-                        file_info.append(file_data)
-                    
-                    return file_info
-                except Exception as e:
-                    logger.error(f"Error fetching repo files: {e}")
-                    return []
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_get_files)
-                file_info = await loop.run_in_executor(None, lambda: future.result())
-            
-            # Filter files to download
+            info = repo_info(repo_id, token=self.token)
+            files = list_repo_files(repo_id, token=self.token)
+
+            file_info: List[Dict] = []
+            for filename in files:
+                file_data = {"filename": filename, "size": None}
+                for sibling in info.siblings:
+                    if sibling.rfilename == filename:
+                        file_data["size"] = sibling.size
+                        break
+                file_info.append(file_data)
+
             files_to_download = []
             for file_data in file_info:
-                if self.should_download_file(file_data['filename'], file_data['size']):
+                if self.should_download_file(file_data["filename"], file_data["size"]):
                     files_to_download.append(file_data)
-            
+
             logger.info(f"Found {len(files_to_download)} files to download from {repo_id}")
             return files_to_download
-            
         except RepositoryNotFoundError:
             logger.error(f"Repository not found: {repo_id}")
             return []
@@ -196,41 +170,23 @@ class HuggingFaceDownloader:
         try:
             # Get list of files to download
             files_info = await self.get_repo_files(repo_id)
-            
+
             if not files_info:
                 logger.warning(f"No files found to download from {repo_id}")
                 return 0, 1
-            
+
             logger.info(f"Downloading {len(files_info)} files from {repo_id}")
-            
-            # Create thread pool for downloads
-            loop = asyncio.get_event_loop()
-            
-            def download_file_sync(file_info):
-                return self.download_single_file(repo_id, file_info['filename'])
-            
-            # Limit concurrent downloads
-            semaphore = asyncio.Semaphore(self.concurrent_downloads)
-            
-            async def download_with_semaphore(file_info):
-                async with semaphore:
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                        future = executor.submit(download_file_sync, file_info)
-                        return await loop.run_in_executor(None, lambda: future.result())
-            
-            # Execute downloads
-            results = await asyncio.gather(
-                *[download_with_semaphore(file_info) for file_info in files_info],
-                return_exceptions=True
-            )
-            
-            # Count results
-            successful = sum(1 for result in results if result is True)
-            failed = len(results) - successful
-            
+
+            successful = 0
+            failed = 0
+            for file_info in files_info:
+                if self.download_single_file(repo_id, file_info["filename"]):
+                    successful += 1
+                else:
+                    failed += 1
+
             logger.info(f"Repository {repo_id} downloads complete: {successful} successful, {failed} failed")
             return successful, failed
-            
         except Exception as e:
             logger.error(f"Error downloading repository {repo_id}: {e}")
             return 0, 1
