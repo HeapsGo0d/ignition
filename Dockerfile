@@ -66,6 +66,9 @@ RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh |
 COPY scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
 
+# Create symlink for download script
+RUN mkdir -p /opt/ignition && ln -sf /workspace/scripts/download_models_once.sh /opt/ignition/download_models_once.sh
+
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""
 ENV HUGGINGFACE_MODELS=""
