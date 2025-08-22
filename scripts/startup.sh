@@ -4,6 +4,13 @@
 
 set -euo pipefail  # safer bash: exit on error/undef; fail on pipe errors
 
+# Syncing flag management
+SYNC_FLAG="/tmp/ignition_syncing"
+touch "$SYNC_FLAG"
+
+# Clean up flag on exit
+trap 'rm -f "$SYNC_FLAG"' EXIT
+
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="/workspace"
@@ -71,6 +78,90 @@ GPU_OK=true
 
 # Health marker file to track successful boots
 HEALTH_MARKER_FILE="$WORKSPACE_ROOT/.ignition_ok"
+
+# Service management functions
+wait_for_port() {
+    local host="$1" port="$2" max="$3"
+    for i in $(seq 1 "$max"); do
+        if (echo > /dev/tcp/$host/$port) >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+start_comfyui_service() {
+    log "INFO" "🎨 Starting ComfyUI service..."
+    cd "$COMFYUI_ROOT"
+    
+    # Build ComfyUI args based on CUDA availability
+    local args=(--listen "0.0.0.0" --port "$COMFYUI_PORT")
+    if [[ "$GPU_OK" == "true" ]]; then
+        args+=(--cuda-device 0)
+    else
+        args+=(--cpu)
+    fi
+    
+    nohup python -u main.py "${args[@]}" > /tmp/comfyui.log 2>&1 &
+    log "INFO" "  • ComfyUI started in background"
+}
+
+start_filebrowser_service() {
+    log "INFO" "📁 Starting filebrowser service..."
+    
+    if ! command -v filebrowser >/dev/null 2>&1; then
+        log "WARN" "filebrowser not found in PATH; skipping File Browser startup."
+        return 0
+    fi
+    
+    # Create filebrowser config directory
+    mkdir -p "$(dirname "$FILEBROWSER_DB")"
+    
+    # Initialize filebrowser database if it doesn't exist
+    if [[ ! -f "$FILEBROWSER_DB" ]]; then
+        log "INFO" "  • Initializing filebrowser database..."
+        
+        filebrowser config init --database "$FILEBROWSER_DB"
+        
+        filebrowser config set \
+            --database "$FILEBROWSER_DB" \
+            --auth.method=json \
+            --signup=false \
+            --root=/workspace \
+            --address=0.0.0.0 \
+            --port="$FILEBROWSER_PORT"
+        
+        # Generate secure password if not provided
+        if [[ -z "$FILEBROWSER_PASS" || ${#FILEBROWSER_PASS} -lt $FILEBROWSER_MINPASS ]]; then
+            FILEBROWSER_PASS="ignition_$(date +%s)_secure"
+            log "INFO" "  • Generated secure password: $FILEBROWSER_PASS"
+        fi
+        
+        filebrowser users add "$FILEBROWSER_USER" "$FILEBROWSER_PASS" \
+            --perm.admin --database "$FILEBROWSER_DB" || {
+            log "ERROR" "Failed to create filebrowser user"
+            exit 1
+        }
+        
+        log "INFO" "  • Admin user created successfully"
+    fi
+    
+    nohup filebrowser \
+        --database "$FILEBROWSER_DB" \
+        --address 0.0.0.0 \
+        --port "$FILEBROWSER_PORT" \
+        --root /workspace > /tmp/filebrowser.log 2>&1 &
+    
+    log "INFO" "  • File browser started in background"
+    
+    # Show current filebrowser password
+    local current_password="$FILEBROWSER_PASS"
+    if [[ -z "$current_password" || ${#current_password} -lt $FILEBROWSER_MINPASS ]]; then
+        current_password="[Generated during DB init - check logs above]"
+    fi
+    log "INFO" "  • Login: $FILEBROWSER_USER / $current_password"
+}
 
 # Print startup banner
 print_banner() {
@@ -362,84 +453,20 @@ download_models() {
     chmod -R u+rwX,go+rX "$COMFYUI_MODELS_DIR" 2>/dev/null || true
     log "INFO" "✅ Model permissions updated"
     
+    # One-shot FORCE_MODEL_SYNC handling
+    if [[ "${FORCE_MODEL_SYNC:-false}" == "true" ]]; then
+        log "INFO" "FORCE_MODEL_SYNC used for initial sync; disabling for remainder of session."
+        export FORCE_MODEL_SYNC="false"
+    fi
+    
     log "INFO" ""
 }
 
-# Start file browser
-start_filebrowser() {
-    log "INFO" "📁 Starting file browser..."
-
-    # If filebrowser binary is missing, don't kill the pod
-    if ! command -v filebrowser >/dev/null 2>&1; then
-        log "WARN" "filebrowser not found in PATH; skipping File Browser startup."
-        return 0
-    fi
+# Start services and wait for readiness
+start_services() {
+    log "INFO" "🚀 Starting services..."
     
-    # Create filebrowser config directory
-    mkdir -p "$(dirname "$FILEBROWSER_DB")"
-    
-    # Initialize filebrowser database if it doesn't exist
-    if [[ ! -f "$FILEBROWSER_DB" ]]; then
-        log "INFO" "  • Initializing filebrowser database..."
-        
-        # Initialize config
-        filebrowser config init --database "$FILEBROWSER_DB"
-        
-        # Set configuration policies
-        filebrowser config set \
-            --database "$FILEBROWSER_DB" \
-            --auth.method=json \
-            --signup=false \
-            --root=/workspace \
-            --address=0.0.0.0 \
-            --port="$FILEBROWSER_PORT"
-        
-        # Generate secure password if not provided
-        if [[ -z "$FILEBROWSER_PASS" || ${#FILEBROWSER_PASS} -lt $FILEBROWSER_MINPASS ]]; then
-            FILEBROWSER_PASS="ignition_$(date +%s)_secure"
-            log "INFO" "  • Generated secure password: $FILEBROWSER_PASS"
-        fi
-        
-        # Create admin user
-        filebrowser users add "$FILEBROWSER_USER" "$FILEBROWSER_PASS" \
-            --perm.admin --database "$FILEBROWSER_DB" || {
-            log "ERROR" "Failed to create filebrowser user"
-            exit 1
-        }
-        
-        log "INFO" "  • Admin user created successfully"
-    fi
-    
-    # Start filebrowser without relying on CWD
-    log "INFO" "  • Starting filebrowser at /workspace:$FILEBROWSER_PORT"
-    filebrowser \
-        --database "$FILEBROWSER_DB" \
-        --address 0.0.0.0 \
-        --port "$FILEBROWSER_PORT" \
-        --root /workspace &
-    
-    local fb_pid=$!
-    
-    # Show current filebrowser password (might have been generated)
-    local current_password="$FILEBROWSER_PASS"
-    if [[ -z "$current_password" || ${#current_password} -lt $FILEBROWSER_MINPASS ]]; then
-        current_password="[Generated during DB init - check logs above]"
-    fi
-    
-    log "INFO" "  • File browser started (PID: $fb_pid)"
-    log "INFO" "  • Login: $FILEBROWSER_USER / $current_password"
-    log "INFO" ""
-}
-
-# Start ComfyUI
-start_comfyui() {
-    log "INFO" "🎨 Starting ComfyUI..."
-    
-    # Change to ComfyUI directory
-    cd "$COMFYUI_ROOT"
-    # CUDA env already set globally in env defaults
-    
-    # Comprehensive health summary before starting ComfyUI
+    # Comprehensive health summary
     log "INFO" "📊 Health Summary:"
     log "INFO" "  • Mount: $(df -h /workspace | tail -1 | awk '{print $4 " available"}')"
     log "INFO" "  • Models: $(find "$COMFYUI_MODELS_DIR" -type f 2>/dev/null | wc -l) files in $COMFYUI_MODELS_DIR"
@@ -457,23 +484,29 @@ start_comfyui() {
     # Export model path for ComfyUI
     export COMFYUI_MODELS_DIR
     
-    log "INFO" "  • Starting ComfyUI server on port $COMFYUI_PORT with models at $COMFYUI_MODELS_DIR"
-    log "INFO" ""
+    # Start services
+    start_comfyui_service
+    start_filebrowser_service
     
-    # Create health marker to indicate successful startup
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
-    log "INFO" "✅ Health marker created - future restarts will be faster"
-
-    # Build ComfyUI args based on CUDA availability
-    local args=(--listen "0.0.0.0" --port "$COMFYUI_PORT")
-    if [[ "$GPU_OK" == "true" ]]; then
-        args+=(--cuda-device 0)
+    # Wait for ComfyUI to be ready
+    log "INFO" "⏳ Waiting for ComfyUI to be ready..."
+    if wait_for_port 127.0.0.1 8188 180; then
+        log "INFO" "✅ ComfyUI is ready on port 8188"
     else
-        args+=(--cpu)
+        log "WARN" "ComfyUI not responding after 180s, but continuing..."
     fi
-
-    # Become PID 1
-    exec python -u main.py "${args[@]}"
+    
+    # Remove syncing flag now that services are up
+    rm -f "$SYNC_FLAG"
+    log "INFO" "🟢 Services started - healthcheck will now monitor port 8188"
+    
+    # Create health marker
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
+    log "INFO" "✅ Health marker created"
+    
+    # Keep container alive by tailing logs
+    log "INFO" "📋 Following service logs..."
+    exec tail -F /tmp/comfyui.log /tmp/filebrowser.log 2>/dev/null
 }
 
 # Cleanup function for graceful shutdown
@@ -498,9 +531,8 @@ main() {
     check_system
     setup_storage
     download_models
-    cuda_preflight           # moved before File Browser to fail/decide early
-    start_filebrowser
-    start_comfyui
+    cuda_preflight           # moved before services to fail/decide early
+    start_services
 }
 
 # Run main function

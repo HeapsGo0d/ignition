@@ -78,5 +78,9 @@ ENV FILEBROWSER_PORT="8080"
 # Expose ports
 EXPOSE 8188 8080
 
+# Add healthcheck that respects syncing phase
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45m --retries=120 \
+  CMD bash -lc '[ -f /tmp/ignition_syncing ] || curl -fsS http://127.0.0.1:8188/ || exit 1'
+
 # Set entrypoint
 ENTRYPOINT ["/workspace/scripts/startup.sh"]
