@@ -19,10 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Upgrade PyTorch to nightly for RTX 5090 support
+# Use stable PyTorch with CUDA 12.1 (matching base image for compatibility)
+# Note: RTX 5090 requires NVIDIA driver >=565.xx and proper container runtime
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip uninstall -y torch torchvision torchaudio && \
-    pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
+    pip install torch==2.3.1+cu121 torchvision==0.18.1+cu121 torchaudio==2.3.1+cu121 --index-url https://download.pytorch.org/whl/cu121
 
 # Runtime libraries and RTX 5090 optimizations
 RUN --mount=type=cache,target=/root/.cache/pip \

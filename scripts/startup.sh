@@ -65,6 +65,7 @@ export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 export DEBUG_MODE="${DEBUG_MODE:-false}"
 export USE_CPU_FALLBACK="${USE_CPU_FALLBACK:-true}"
+export IGNITION_DOWNLOADS_LOG="${IGNITION_DOWNLOADS_LOG:-/tmp/ignition_downloads.log}"
 
 # GPU visibility defaults
 export NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-0}
@@ -158,18 +159,39 @@ check_system() {
 cuda_preflight() {
     log "INFO" "🔧 Verifying CUDA visibility for Python/Torch..."
     
+    # First check nvidia-smi
+    if command -v nvidia-smi &> /dev/null; then
+        log "INFO" "  • nvidia-smi found, checking GPU info:"
+        nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader 2>&1 | while read line; do
+            log "INFO" "    $line"
+        done | tee -a /tmp/ignition_cuda_check.log
+    else
+        log "WARN" "  • nvidia-smi not available"
+    fi
+    
+    # Check environment variables
+    log "INFO" "  • Environment:"
+    log "INFO" "    NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-unset}"
+    log "INFO" "    CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-unset}"
+    log "INFO" "    LD_LIBRARY_PATH: ${LD_LIBRARY_PATH:-unset}"
+    
     {
         echo "Verifying CUDA via Python/Torch..."
         python3 - <<'PY'
-import sys
+import sys, os
 try:
     import torch
-    print("torch version:", torch.__version__)
-    print("cuda available:", torch.cuda.is_available())
-    print("cuda device count:", torch.cuda.device_count())
-    if torch.cuda.is_available():
-        print("current device:", torch.cuda.current_device())
-        print("device name:", torch.cuda.get_device_name(0))
+    print("torch:", torch.__version__, "cuda:", torch.version.cuda or "None",
+          "is_available:", torch.cuda.is_available(),
+          "devices:", torch.cuda.device_count())
+    if torch.cuda.is_available(): 
+        print("gpu0:", torch.cuda.get_device_name(0))
+    else:
+        print("CUDA not available - possible causes:")
+        print("- PyTorch compiled without CUDA support")
+        print("- CUDA runtime library mismatch")
+        print("- No GPU visible to container")
+        print("- Missing NVIDIA container runtime")
     sys.exit(0)
 except Exception as e:
     print("CUDA/Torch check FAILED:", repr(e))
@@ -185,6 +207,10 @@ PY
         GPU_OK=false
         if [[ "$USE_CPU_FALLBACK" == "true" ]]; then
             log "WARN" "⚠️ CUDA not available, falling back to CPU"
+            log "INFO" "  • To fix CUDA issues, ensure:"
+            log "INFO" "    - Container started with --gpus all or --runtime=nvidia"
+            log "INFO" "    - PyTorch version matches CUDA runtime (currently $(python3 -c "import torch; print(torch.__version__)" 2>/dev/null || echo "unknown"))"
+            log "INFO" "    - NVIDIA Container Toolkit installed on host"
         else
             log "WARN" "⚠️ CUDA not available and USE_CPU_FALLBACK=false, but continuing anyway"
         fi
@@ -261,7 +287,13 @@ start_filebrowser() {
         # Generate secure password if not provided
         if [[ -z "$FILEBROWSER_PASS" || ${#FILEBROWSER_PASS} -lt $FILEBROWSER_MINPASS ]]; then
             FILEBROWSER_PASS="ignition_$(date +%s)_secure"
-            log "INFO" "  • Generated secure password: $FILEBROWSER_PASS"
+            if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+                log "DEBUG" "  • Generated secure password: $FILEBROWSER_PASS"
+            else
+                log "INFO" "  • Generated secure password (check /tmp/filebrowser_password.txt)"
+                echo "$FILEBROWSER_PASS" > /tmp/filebrowser_password.txt
+                chmod 600 /tmp/filebrowser_password.txt
+            fi
         fi
         
         filebrowser users add "$FILEBROWSER_USER" "$FILEBROWSER_PASS" \
@@ -280,15 +312,27 @@ start_filebrowser() {
         --root /workspace > /tmp/filebrowser.log 2>&1 &
     
     log "INFO" "  • File browser started in background"
-    log "INFO" "  • Login: $FILEBROWSER_USER / ${FILEBROWSER_PASS:-[check logs above]}"
+    if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+        log "DEBUG" "  • Login: $FILEBROWSER_USER / ${FILEBROWSER_PASS:-[check logs above]}"
+    else
+        log "INFO" "  • Login: $FILEBROWSER_USER / [password in /tmp/filebrowser_password.txt]"
+    fi
 }
 
 # Background download loop with exponential backoff
 download_loop() {
     local delay=60
+    local download_script="$SCRIPT_DIR/download_models_once.sh"
+    
+    # Validate download script exists
+    if [[ ! -x "$download_script" ]]; then
+        log "ERROR" "Download script not found or not executable: $download_script"
+        return 1
+    fi
+    
     while true; do
         log "INFO" "🔄 Starting model download attempt..."
-        if "$SCRIPT_DIR/download_models_once.sh"; then
+        if bash "$download_script" 2>&1 | tee -a "${IGNITION_DOWNLOADS_LOG:-/tmp/ignition_downloads.log}"; then
             log "INFO" "✅ Model sync succeeded"
             break
         else
@@ -302,8 +346,20 @@ download_loop() {
 # Start background downloads
 start_downloads() {
     log "INFO" "📥 Starting background model downloads..."
-    nohup bash -c "$(declare -f log download_loop); download_loop" > /tmp/ignition_downloads.log 2>&1 &
-    log "INFO" "  • Download loop started in background"
+    
+    # Ensure download log exists
+    touch "$IGNITION_DOWNLOADS_LOG"
+    
+    # Start download loop in background with proper function exports
+    nohup bash -c "
+        export SCRIPT_DIR=\"$SCRIPT_DIR\"
+        export IGNITION_DOWNLOADS_LOG=\"$IGNITION_DOWNLOADS_LOG\"
+        $(declare -f log)
+        $(declare -f download_loop)
+        download_loop
+    " > "$IGNITION_DOWNLOADS_LOG" 2>&1 &
+    
+    log "INFO" "  • Download loop started in background (log: $IGNITION_DOWNLOADS_LOG)"
 }
 
 # Main execution
