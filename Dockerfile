@@ -1,8 +1,8 @@
 # Ignition - ComfyUI with Dynamic Model Loading
 # Optimized for RTX 5090 and RunPod deployment
-# Using NVIDIA's official PyTorch container (proven RTX 5090 support)
+# Using NVIDIA's official PyTorch container with RTX 5090 support
 
-FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel AS base
+FROM pytorch/pytorch:2.5.0-cuda12.4-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
