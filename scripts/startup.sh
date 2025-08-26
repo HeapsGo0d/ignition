@@ -2,7 +2,7 @@
 # Ignition Startup Script
 # Orchestrates model downloads and ComfyUI startup for RunPod
 
-set -e  # Exit on any error
+set -euo pipefail  # Exit on any error, undefined variables, or pipe failures
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

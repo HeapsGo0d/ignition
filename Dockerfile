@@ -47,7 +47,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM base AS final
 
-# Remove duplicate opencv-python install (already installed above)
+# Final stage setup
 
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet}

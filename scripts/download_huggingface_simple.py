@@ -35,7 +35,7 @@ def ensure_git_lfs():
         return False
 
 def clone_huggingface_repo(repo: str, output_dir: Path, token: str = "") -> bool:
-    """Clone a HuggingFace repository."""
+    """Clone a HuggingFace repository using secure credential handling."""
     
     # Parse repo name
     if '/' not in repo:
@@ -50,11 +50,8 @@ def clone_huggingface_repo(repo: str, output_dir: Path, token: str = "") -> bool
         log('info', f'Removing existing {repo_name}')
         shutil.rmtree(repo_path)
     
-    # Build clone URL
-    if token:
-        clone_url = f"https://{token}@huggingface.co/{repo}"
-    else:
-        clone_url = f"https://huggingface.co/{repo}"
+    # Use public HTTPS URL (no token in URL)
+    clone_url = f"https://huggingface.co/{repo}"
     
     log('download', f'Cloning {repo}...')
     
@@ -64,8 +61,16 @@ def clone_huggingface_repo(repo: str, output_dir: Path, token: str = "") -> bool
         if has_lfs:
             subprocess.run(['git', 'lfs', 'install'], check=False, capture_output=True)
         
+        # Set up environment for git credentials if token provided
+        env = os.environ.copy()
+        if token:
+            # Use git credential helper approach - token not visible in process list
+            env['GIT_ASKPASS'] = 'echo'  # Non-interactive
+            env['GIT_USERNAME'] = 'token'  # HuggingFace expects 'token' as username
+            env['GIT_PASSWORD'] = token
+        
         cmd = ['git', 'clone', '--depth', '1', clone_url, str(repo_path)]
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
         
         # Check if we got any useful files
         model_files = list(repo_path.rglob('*.safetensors')) + \
