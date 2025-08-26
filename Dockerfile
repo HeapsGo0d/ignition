@@ -10,7 +10,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH \
-    CUDA_DEVICE_ORDER=PCI_BUS_ID
+    CUDA_DEVICE_ORDER=PCI_BUS_ID \
+    PIP_NO_CACHE_DIR=1 \
+    XDG_CACHE_HOME=/workspace/.cache \
+    HF_HOME=/workspace/.cache/huggingface \
+    HUGGINGFACE_HUB_CACHE=/workspace/.cache/huggingface
 
 # Set working directory
 WORKDIR /workspace
@@ -29,9 +33,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# Runtime libraries
+# Runtime libraries (triton comes with PyTorch 2.8.0)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install pyyaml gdown triton
+    pip install pyyaml gdown
 
 # Install ComfyUI directly (more reliable than comfy-cli)
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
@@ -56,7 +60,10 @@ FROM base AS final
 # Final stage setup
 
 # Create model directories
-RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet,diffusion_models,text_encoders}
+RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet,diffusion_models,text_encoders,clip,unet}
+
+# Create HuggingFace cache directory
+RUN mkdir -p /workspace/.cache/huggingface
 
 # Install filebrowser for file management
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash

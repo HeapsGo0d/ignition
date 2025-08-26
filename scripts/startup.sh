@@ -10,6 +10,12 @@ WORKSPACE_ROOT="/workspace"
 COMFYUI_ROOT="/workspace/ComfyUI"
 LOG_FILE="/tmp/ignition_startup.log"
 
+# Set up caches and paths early
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
+export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
+export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME}"
+mkdir -p "$HF_HOME" || true
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -98,9 +104,9 @@ check_system() {
 setup_storage() {
     log "INFO" "💾 Setting up model directories..."
     
-    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models,diffusion_models,text_encoders}
+    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models,diffusion_models,text_encoders,clip,unet}
     
-    for model_type in checkpoints loras vae embeddings controlnet upscale_models diffusion_models text_encoders; do
+    for model_type in checkpoints loras vae embeddings controlnet upscale_models diffusion_models text_encoders clip unet; do
         log "INFO" "  • Created $model_type directory"
     done
     
@@ -110,14 +116,22 @@ setup_storage() {
 
 # Use the download_models_once.sh script for downloads
 download_models() {
+    if [[ -z "$CIVITAI_MODELS$HUGGINGFACE_MODELS" ]]; then
+        log "INFO" "📥 No models requested; skipping downloads."
+        log "INFO" ""
+        return
+    fi
+
     log "INFO" "📥 Starting model downloads..."
-    
     if bash "$SCRIPT_DIR/download_models_once.sh"; then
         log "INFO" "✅ Model downloads completed"
     else
-        log "WARN" "⚠️ Some model downloads may have failed, but continuing"
+        if [[ "${FORCE_MODEL_SYNC}" == "true" ]]; then
+            log "ERROR" "Model download failed and FORCE_MODEL_SYNC=true"
+            exit 3
+        fi
+        log "WARN" "⚠️ Some model downloads may have failed, continuing"
     fi
-    
     log "INFO" ""
 }
 
@@ -135,13 +149,12 @@ start_filebrowser() {
         local fb_password="$FILEBROWSER_PASSWORD"
         if [[ ${#fb_password} -lt 12 ]]; then
             fb_password="ignition_${FILEBROWSER_PASSWORD}_2024"
-            log "INFO" "  • Extended password for security: $fb_password"
         fi
         
         filebrowser -d "$db_path" config set --auth.method=json --auth.header=""
         filebrowser -d "$db_path" users add admin "$fb_password" --perm.admin
         
-        log "INFO" "  • Admin user created"
+        log "INFO" "  • Admin user created (password set; not logged)"
     fi
     
     log "INFO" "  • Starting filebrowser on port $FILEBROWSER_PORT"
@@ -151,34 +164,40 @@ start_filebrowser() {
         --address "0.0.0.0" \
         --port "$FILEBROWSER_PORT" &
     
-    log "INFO" "  • Login: admin / [check password above]"
+    log "INFO" "  • Login: admin (password not shown in logs)"
     log "INFO" ""
 }
 
 gpu_preflight() {
     log "INFO" "🔧 GPU preflight check..."
-    
-    # Check nvidia-smi
-    log "INFO" "  • Running nvidia-smi..."
-    if ! nvidia-smi; then
+
+    # Minimal nvidia-smi (reduces spam)
+    if ! nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader; then
         log "ERROR" "nvidia-smi failed - GPU runtime not available"
         exit 1
     fi
-    
-    # Set CUDA_VISIBLE_DEVICES if not set by user
+
+    # Select device by UUID if user hasn't pinned one
     if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
-        local first_uuid
-        first_uuid="$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1)"
-        export CUDA_VISIBLE_DEVICES="$first_uuid"
-        log "INFO" "  • CUDA_VISIBLE_DEVICES set to first GPU UUID: $CUDA_VISIBLE_DEVICES"
+        first_uuid="$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1 || true)"
+        if [[ -n "$first_uuid" ]]; then
+            export CUDA_VISIBLE_DEVICES="$first_uuid"
+            log "INFO" "  • CUDA_VISIBLE_DEVICES set to first GPU UUID"
+        else
+            export CUDA_VISIBLE_DEVICES=0
+            log "WARN" "  • UUID query empty; falling back to index 0"
+        fi
     fi
-    
-    # Set library paths for driver
+
+    # Driver libs
     export LD_LIBRARY_PATH="/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
-    
-    # Test PyTorch CUDA
-    log "INFO" "  • Testing PyTorch CUDA support..."
-    python3 - <<'PY'
+
+    # Use one Python everywhere
+    PYBIN="$(command -v python3 || command -v python)"
+    log "INFO" "  • Using Python at: $PYBIN"
+
+    # Torch CUDA check
+    "$PYBIN" - <<'PY'
 import torch, sys
 print(f"[GPU] torch: {torch.__version__} cuda: {torch.version.cuda}")
 ok = torch.cuda.is_available()
@@ -187,26 +206,27 @@ if not ok:
     sys.exit(2)
 print(f"[GPU] device: {torch.cuda.get_device_name(0)} cap: {torch.cuda.get_device_capability(0)}")
 PY
-    
-    if [[ $? -eq 0 ]]; then
-        log "INFO" "✅ GPU preflight complete"
-    else
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
         log "ERROR" "PyTorch CUDA initialization failed"
         exit 2
     fi
-    
+    log "INFO" "✅ GPU preflight complete"
     log "INFO" ""
 }
 
 start_comfyui() {
     log "INFO" "🎨 Starting ComfyUI..."
-    
+
+    if command -v ss >/dev/null 2>&1 && ss -tulpn 2>/dev/null | grep -q ":$COMFYUI_PORT "; then
+        log "ERROR" "Port $COMFYUI_PORT already in use"
+        exit 4
+    fi
+
     cd "$COMFYUI_ROOT"
-    
+    PYBIN="$(command -v python3 || command -v python)"
     log "INFO" "  • Starting with CUDA support"
-    exec python3 main.py \
-        --listen "0.0.0.0" \
-        --port "$COMFYUI_PORT"
+    exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
 }
 
 # Signal handlers
