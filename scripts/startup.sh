@@ -16,6 +16,9 @@ export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME}"
 mkdir -p "$HF_HOME" || true
 
+# Consistent Python interpreter
+PYBIN="$(command -v python3 || command -v python)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -171,15 +174,12 @@ start_filebrowser() {
 gpu_preflight() {
     log "INFO" "🔧 GPU preflight check..."
 
-    # Minimal nvidia-smi (reduces spam)
-    if ! nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader; then
-        log "ERROR" "nvidia-smi failed - GPU runtime not available"
-        exit 1
-    fi
+    # Be tolerant: nvidia-smi is informative only; never hard-fail here
+    nvidia-smi -L || log "WARN" "nvidia-smi device listing failed; continuing"
 
-    # Select device by UUID if user hasn't pinned one
+    # Select first GPU by UUID if user hasn't pinned one
     if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
-        first_uuid="$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1 || true)"
+        first_uuid="$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1 2>/dev/null || true)"
         if [[ -n "$first_uuid" ]]; then
             export CUDA_VISIBLE_DEVICES="$first_uuid"
             log "INFO" "  • CUDA_VISIBLE_DEVICES set to first GPU UUID"
@@ -189,14 +189,13 @@ gpu_preflight() {
         fi
     fi
 
-    # Driver libs
+    # Ensure driver libs are in path
     export LD_LIBRARY_PATH="/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
 
     # Use one Python everywhere
-    PYBIN="$(command -v python3 || command -v python)"
     log "INFO" "  • Using Python at: $PYBIN"
 
-    # Torch CUDA check
+    # Single source of truth: PyTorch must see CUDA
     "$PYBIN" - <<'PY'
 import torch, sys
 print(f"[GPU] torch: {torch.__version__} cuda: {torch.version.cuda}")
@@ -211,6 +210,7 @@ PY
         log "ERROR" "PyTorch CUDA initialization failed"
         exit 2
     fi
+
     log "INFO" "✅ GPU preflight complete"
     log "INFO" ""
 }
@@ -224,7 +224,6 @@ start_comfyui() {
     fi
 
     cd "$COMFYUI_ROOT"
-    PYBIN="$(command -v python3 || command -v python)"
     log "INFO" "  • Starting with CUDA support"
     exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
 }
