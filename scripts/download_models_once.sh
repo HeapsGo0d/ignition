@@ -115,7 +115,7 @@ download_models() {
         log "INFO" "CivitAI download started (PID: $civitai_pid)"
     fi
     
-    # Start HuggingFace downloads
+    # Start HuggingFace downloads (using FLUX model keys: flux1-dev,clip_l,t5xxl_fp8,ae)
     if [[ -n "$HUGGINGFACE_MODELS" && "$hf_needed" == "true" ]]; then
         log "INFO" "$DOWNLOAD Starting HuggingFace downloads..."
         download_needed=true
