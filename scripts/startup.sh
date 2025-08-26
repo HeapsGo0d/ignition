@@ -87,9 +87,10 @@ check_system() {
         exit 1
     fi
     
-    # Check if Python scripts exist
-    if [[ ! -f "$SCRIPT_DIR/download_civitai.py" ]] || [[ ! -f "$SCRIPT_DIR/download_huggingface.py" ]]; then
+    # Check if download scripts exist
+    if [[ ! -f "$SCRIPT_DIR/download_civitai_simple.py" ]] || [[ ! -f "$SCRIPT_DIR/download_huggingface_simple.py" ]] || [[ ! -x "$SCRIPT_DIR/download_models_once.sh" ]]; then
         log "ERROR" "Download scripts not found in $SCRIPT_DIR"
+        log "ERROR" "Expected: download_civitai_simple.py, download_huggingface_simple.py, download_models_once.sh"
         exit 1
     fi
     
