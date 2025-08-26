@@ -1,6 +1,6 @@
 #!/bin/bash
-# Simple one-shot model download script for Ignition
-# Uses aria2c-based downloaders for reliability
+# Fixed one-shot model download script for Ignition
+# Properly separates logging from return values
 
 set -euo pipefail
 
@@ -13,6 +13,7 @@ export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
+export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 
 # Status indicators
 SUCCESS='✅'
@@ -29,12 +30,13 @@ log() {
     echo "[$timestamp] [$level] $message"
 }
 
-# Check if downloads are needed
+# Check if downloads are needed - returns to stdout ONLY the decision
 check_if_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
     
-    log "INFO" "Checking if model downloads are needed..."
+    log "INFO" "🔍 Checking if model downloads are needed..." >&2
+    log "INFO" "Models directory: $COMFYUI_MODELS_DIR" >&2
     
     # Count existing model files
     local model_count=0
@@ -42,30 +44,44 @@ check_if_downloads_needed() {
         model_count=$(find "$COMFYUI_MODELS_DIR" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.bin" 2>/dev/null | wc -l)
     fi
     
-    log "INFO" "Found $model_count existing model files"
+    log "INFO" "Found $model_count existing model files" >&2
     
-    # Check CivitAI downloads needed
-    if [[ -n "$CIVITAI_MODELS" ]]; then
-        local civitai_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
-        log "INFO" "$civitai_count CivitAI models requested"
+    # Check FORCE_MODEL_SYNC first
+    if [[ "${FORCE_MODEL_SYNC}" == "true" ]]; then
+        log "INFO" "🔄 FORCE_MODEL_SYNC=true - forcing all downloads" >&2
+        civitai_needed=true
+        hf_needed=true
+    else
+        # Check CivitAI downloads needed
+        if [[ -n "$CIVITAI_MODELS" ]]; then
+            local civitai_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
+            log "INFO" "📥 $civitai_count CivitAI models requested: $CIVITAI_MODELS" >&2
+            
+            if [[ $model_count -eq 0 ]]; then
+                civitai_needed=true
+                log "INFO" "✅ CivitAI downloads needed (no models found)" >&2
+            else
+                log "INFO" "⏭️ CivitAI downloads skipped ($model_count models present)" >&2
+            fi
+        fi
         
-        if [[ $model_count -eq 0 ]] || [[ "${FORCE_MODEL_SYNC:-false}" == "true" ]]; then
-            civitai_needed=true
-            log "INFO" "CivitAI downloads needed"
+        # Check HuggingFace downloads needed  
+        if [[ -n "$HUGGINGFACE_MODELS" ]]; then
+            local hf_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
+            log "INFO" "🤗 $hf_count HuggingFace models requested: $HUGGINGFACE_MODELS" >&2
+            
+            if [[ $model_count -eq 0 ]]; then
+                hf_needed=true
+                log "INFO" "✅ HuggingFace downloads needed (no models found)" >&2
+            else
+                log "INFO" "⏭️ HuggingFace downloads skipped ($model_count models present)" >&2
+            fi
         fi
     fi
     
-    # Check HuggingFace downloads needed  
-    if [[ -n "$HUGGINGFACE_MODELS" ]]; then
-        local hf_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
-        log "INFO" "$hf_count HuggingFace models requested"
-        
-        if [[ $model_count -eq 0 ]] || [[ "${FORCE_MODEL_SYNC:-false}" == "true" ]]; then
-            hf_needed=true
-            log "INFO" "HuggingFace downloads needed"
-        fi
-    fi
+    log "INFO" "📋 Download decision: CivitAI=$civitai_needed, HuggingFace=$hf_needed" >&2
     
+    # Return ONLY the decision to stdout
     echo "$civitai_needed $hf_needed"
 }
 
@@ -76,7 +92,7 @@ download_models() {
     # Create model directories
     mkdir -p "$COMFYUI_MODELS_DIR"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models}
     
-    # Check what downloads are needed
+    # Get download decisions properly
     local needs_check=$(check_if_downloads_needed)
     local civitai_needed=$(echo "$needs_check" | cut -d' ' -f1)
     local hf_needed=$(echo "$needs_check" | cut -d' ' -f2)
@@ -127,6 +143,10 @@ download_models() {
                 all_success=false
             fi
         done
+        
+        # Final model count
+        local final_count=$(find "$COMFYUI_MODELS_DIR" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.bin" 2>/dev/null | wc -l)
+        log "INFO" "Final model count: $final_count files"
         
         if [[ "$all_success" == true ]]; then
             log "INFO" "$SUCCESS All downloads completed successfully"
