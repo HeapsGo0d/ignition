@@ -2,7 +2,7 @@
 # Optimized for RTX 5090 and RunPod deployment
 # Using NVIDIA's official PyTorch container with RTX 5090 support
 
-FROM pytorch/pytorch:2.5.0-cuda12.4-cudnn9-devel AS base
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -22,6 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Core Python tooling (PyTorch already included in base image)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
+
+# Upgrade PyTorch for RTX 5090 support (sm_120)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # Runtime libraries
 RUN --mount=type=cache,target=/root/.cache/pip \

@@ -134,25 +134,31 @@ download_models() {
     if [[ "$download_needed" == true ]]; then
         log "INFO" "Waiting for downloads to complete..."
         
-        local all_success=true
+        local success_count=0
+        local total_processes=${#download_processes[@]}
+        
         for pid in "${download_processes[@]}"; do
             if wait $pid; then
                 log "INFO" "Download process $pid completed successfully"
+                ((success_count++))
             else
                 log "ERROR" "Download process $pid failed"
-                all_success=false
             fi
         done
         
         # Final model count
         local final_count=$(find "$COMFYUI_MODELS_DIR" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.bin" 2>/dev/null | wc -l)
         log "INFO" "Final model count: $final_count files"
+        log "INFO" "Download summary: $success_count/$total_processes processes succeeded"
         
-        if [[ "$all_success" == true ]]; then
+        if [[ $success_count -eq $total_processes ]]; then
             log "INFO" "$SUCCESS All downloads completed successfully"
             return 0
+        elif [[ $success_count -gt 0 ]]; then
+            log "INFO" "$WARNING Partial success: $success_count/$total_processes downloads completed"
+            return 0  # Consider partial success as overall success
         else
-            log "ERROR" "$ERROR Some downloads failed"
+            log "ERROR" "$ERROR All downloads failed"
             return 1
         fi
     else
