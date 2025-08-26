@@ -13,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install additional system dependencies
+# Install additional system dependencies including aria2 for downloads
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ffmpeg git aria2 git-lfs wget vim \
     libgl1-mesa-glx libglib2.0-0 \
@@ -47,8 +47,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM base AS final
 
-# Final stage optimizations
-RUN python -m pip install opencv-python
+# Remove duplicate opencv-python install (already installed above)
 
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet}
@@ -71,6 +70,10 @@ ENV FILEBROWSER_PORT="8080"
 
 # Expose ports
 EXPOSE 8188 8080
+
+# Add basic healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
+  CMD curl -f http://127.0.0.1:8188/ || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/workspace/scripts/startup.sh"]

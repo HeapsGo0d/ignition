@@ -204,9 +204,10 @@ download_models() {
         log "INFO" "🎨 Downloading CivitAI models..."
         download_needed=true
         
-        python3 "$SCRIPT_DIR/download_civitai.py" \
+        python3 "$SCRIPT_DIR/download_civitai_simple.py" \
             --models "$CIVITAI_MODELS" \
-            --token "$CIVITAI_TOKEN" &
+            --token "$CIVITAI_TOKEN" \
+            --output-dir "$COMFYUI_ROOT/models/checkpoints" &
         
         civitai_pid=$!
         download_processes+=($civitai_pid)
@@ -220,9 +221,10 @@ download_models() {
         log "INFO" "🤗 Downloading HuggingFace models..."
         download_needed=true
         
-        python3 "$SCRIPT_DIR/download_huggingface.py" \
+        python3 "$SCRIPT_DIR/download_huggingface_simple.py" \
             --repos "$HUGGINGFACE_MODELS" \
-            --token "$HF_TOKEN" &
+            --token "$HF_TOKEN" \
+            --output-dir "$COMFYUI_ROOT/models/checkpoints" &
         
         hf_pid=$!
         download_processes+=($hf_pid)
@@ -355,11 +357,20 @@ start_comfyui() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Ignition startup completed successfully" > "$HEALTH_MARKER_FILE"
     log "INFO" "✅ Health marker created - future restarts will be faster"
     
-    # Start ComfyUI (this will run in foreground)
-    exec python3 main.py \
-        --listen "0.0.0.0" \
-        --port "$COMFYUI_PORT" \
-        --cuda-device 0
+    # Start ComfyUI with CUDA fallback (this will run in foreground)
+    if command -v nvidia-smi &> /dev/null && nvidia-smi > /dev/null 2>&1; then
+        log "INFO" "  • Starting with CUDA support"
+        exec python3 main.py \
+            --listen "0.0.0.0" \
+            --port "$COMFYUI_PORT" \
+            --cuda-device 0
+    else
+        log "INFO" "  • Starting in CPU mode (no CUDA detected)"
+        exec python3 main.py \
+            --listen "0.0.0.0" \
+            --port "$COMFYUI_PORT" \
+            --cpu
+    fi
 }
 
 # Cleanup function for graceful shutdown
