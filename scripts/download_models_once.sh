@@ -123,7 +123,7 @@ download_models() {
         python3 "$SCRIPT_DIR/download_huggingface_simple.py" \
             --repos "$HUGGINGFACE_MODELS" \
             --token "$HF_TOKEN" \
-            --output-dir "$COMFYUI_MODELS_DIR/checkpoints" &
+            --output-dir "$COMFYUI_MODELS_DIR" &
         
         hf_pid=$!
         download_processes+=($hf_pid)

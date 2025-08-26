@@ -25,23 +25,32 @@ STATUS = {
     'download': '📥'
 }
 
-# Hearmeman's proven FLUX model URLs
+# ComfyUI workflow FLUX model URLs with proper directory structure
 FLUX_MODELS = {
     'flux1-dev': {
-        'url': 'https://huggingface.co/lllyasviel/flux1_dev/resolve/main/flux1-dev-fp8.safetensors',
-        'filename': 'flux1-dev-fp8.safetensors'
+        'url': 'https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev.safetensors',
+        'filename': 'flux1-dev.safetensors',
+        'subdir': 'diffusion_models'
     },
     'clip_l': {
         'url': 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors', 
-        'filename': 'clip_l.safetensors'
+        'filename': 'clip_l.safetensors',
+        'subdir': 'text_encoders'
+    },
+    't5xxl_fp16': {
+        'url': 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors',
+        'filename': 't5xxl_fp16.safetensors',
+        'subdir': 'text_encoders'
     },
     't5xxl_fp8': {
-        'url': 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors',
-        'filename': 't5xxl_fp8_e4m3fn.safetensors'
+        'url': 'https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn_scaled.safetensors',
+        'filename': 't5xxl_fp8_e4m3fn_scaled.safetensors',
+        'subdir': 'text_encoders'
     },
     'ae': {
-        'url': 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors',
-        'filename': 'ae.safetensors'
+        'url': 'https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors',
+        'filename': 'ae.safetensors',
+        'subdir': 'vae'
     }
 }
 
@@ -112,9 +121,9 @@ def normalize_flux_key(model_input: str) -> str:
     # Map common HF repo formats to our internal keys
     repo_mappings = {
         'black-forest-labs/FLUX.1-dev': 'flux1-dev',
-        'black-forest-labs/FLUX.1-schnell': 'ae',  # ae.safetensors is from schnell
-        'lllyasviel/flux1_dev': 'flux1-dev',
-        'comfyanonymous/flux_text_encoders': 'clip_l,t5xxl_fp8'  # This repo has multiple files
+        'black-forest-labs/FLUX.1-schnell': 'ae',
+        'Comfy-Org/flux1-dev': 'flux1-dev',
+        'comfyanonymous/flux_text_encoders': 'clip_l,t5xxl_fp16'  # Default to fp16 variant
     }
     
     # Check if it's a direct repo mapping
@@ -128,8 +137,8 @@ def normalize_flux_key(model_input: str) -> str:
     # Default fallback
     return model_input
 
-def download_flux_model(model_key: str, output_dir: Path, token: str = "") -> bool:
-    """Download a specific FLUX model using Hearmeman's proven URLs."""
+def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") -> bool:
+    """Download a specific FLUX model to the correct ComfyUI directory structure."""
     
     if model_key not in FLUX_MODELS:
         log('error', f'Unknown FLUX model: {model_key}. Available: {", ".join(FLUX_MODELS.keys())}')
@@ -138,17 +147,21 @@ def download_flux_model(model_key: str, output_dir: Path, token: str = "") -> bo
     model_info = FLUX_MODELS[model_key]
     url = model_info['url']
     filename = model_info['filename']
+    subdir = model_info['subdir']
     
-    log('info', f'Downloading FLUX model: {model_key}')
-    return download_with_aria2(url, output_dir, filename, token)
+    # Create the proper subdirectory
+    target_dir = base_output_dir / subdir
+    
+    log('info', f'Downloading FLUX model: {model_key} to {subdir}/')
+    return download_with_aria2(url, target_dir, filename, token)
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Simple HuggingFace downloader for Ignition using Hearmeman\'s approach')
     parser.add_argument('--repos', required=True, help='Comma-separated list of FLUX model keys: flux1-dev,clip_l,t5xxl_fp8,ae')
     parser.add_argument('--token', default='', help='HuggingFace API token')
-    parser.add_argument('--output-dir', default='/workspace/ComfyUI/models/checkpoints', 
-                        help='Output directory')
+    parser.add_argument('--output-dir', default='/workspace/ComfyUI/models', 
+                        help='Base ComfyUI models directory')
     
     args = parser.parse_args()
     

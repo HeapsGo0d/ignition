@@ -7,8 +7,10 @@ FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel AS base
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    CUDA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH \
+    CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 # Set working directory
 WORKDIR /workspace
@@ -23,9 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Upgrade PyTorch for RTX 5090 support (sm_120)
+# Upgrade PyTorch to 2.8.0+cu128 for RTX 5090 support (sm_120)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 # Runtime libraries
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -54,7 +56,7 @@ FROM base AS final
 # Final stage setup
 
 # Create model directories
-RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet}
+RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet,diffusion_models,text_encoders}
 
 # Install filebrowser for file management
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash

@@ -98,9 +98,9 @@ check_system() {
 setup_storage() {
     log "INFO" "💾 Setting up model directories..."
     
-    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models}
+    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models,diffusion_models,text_encoders}
     
-    for model_type in checkpoints loras vae embeddings controlnet upscale_models; do
+    for model_type in checkpoints loras vae embeddings controlnet upscale_models diffusion_models text_encoders; do
         log "INFO" "  • Created $model_type directory"
     done
     
@@ -155,25 +155,58 @@ start_filebrowser() {
     log "INFO" ""
 }
 
+gpu_preflight() {
+    log "INFO" "🔧 GPU preflight check..."
+    
+    # Check nvidia-smi
+    log "INFO" "  • Running nvidia-smi..."
+    if ! nvidia-smi; then
+        log "ERROR" "nvidia-smi failed - GPU runtime not available"
+        exit 1
+    fi
+    
+    # Set CUDA_VISIBLE_DEVICES if not set by user
+    if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+        local first_uuid
+        first_uuid="$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1)"
+        export CUDA_VISIBLE_DEVICES="$first_uuid"
+        log "INFO" "  • CUDA_VISIBLE_DEVICES set to first GPU UUID: $CUDA_VISIBLE_DEVICES"
+    fi
+    
+    # Set library paths for driver
+    export LD_LIBRARY_PATH="/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+    
+    # Test PyTorch CUDA
+    log "INFO" "  • Testing PyTorch CUDA support..."
+    python3 - <<'PY'
+import torch, sys
+print(f"[GPU] torch: {torch.__version__} cuda: {torch.version.cuda}")
+ok = torch.cuda.is_available()
+print(f"[GPU] cuda available: {ok}")
+if not ok:
+    sys.exit(2)
+print(f"[GPU] device: {torch.cuda.get_device_name(0)} cap: {torch.cuda.get_device_capability(0)}")
+PY
+    
+    if [[ $? -eq 0 ]]; then
+        log "INFO" "✅ GPU preflight complete"
+    else
+        log "ERROR" "PyTorch CUDA initialization failed"
+        exit 2
+    fi
+    
+    log "INFO" ""
+}
+
 start_comfyui() {
     log "INFO" "🎨 Starting ComfyUI..."
     
     cd "$COMFYUI_ROOT"
     
-    # Check for CUDA support
-    if command -v nvidia-smi &> /dev/null && nvidia-smi > /dev/null 2>&1; then
-        log "INFO" "  • Starting with CUDA support"
-        exec python3 main.py \
-            --listen "0.0.0.0" \
-            --port "$COMFYUI_PORT" \
-            --cuda-device 0
-    else
-        log "INFO" "  • Starting in CPU mode (no CUDA detected)"
-        exec python3 main.py \
-            --listen "0.0.0.0" \
-            --port "$COMFYUI_PORT" \
-            --cpu
-    fi
+    log "INFO" "  • Starting with CUDA support"
+    exec python3 main.py \
+        --listen "0.0.0.0" \
+        --port "$COMFYUI_PORT"
 }
 
 # Signal handlers
@@ -193,6 +226,7 @@ main() {
     setup_storage
     download_models
     start_filebrowser
+    gpu_preflight
     start_comfyui
 }
 
