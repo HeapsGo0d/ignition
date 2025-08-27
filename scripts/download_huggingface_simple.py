@@ -53,8 +53,8 @@ FLUX_MODELS = {
         'subdir': 'vae'
     },
     'flux1-krea-dev': {
-        'url': 'https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev_fp8_scaled.safetensors',
-        'filename': 'flux1-krea-dev_fp8_scaled.safetensors',
+        'url': 'https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev.safetensors',
+        'filename': 'flux1-krea-dev.safetensors',
         'subdir': 'diffusion_models'
     }
 }

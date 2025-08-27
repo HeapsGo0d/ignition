@@ -133,6 +133,12 @@ get_configuration() {
     CIVITAI_MODELS=${input_civitai:-"138977,46846"}
     echo ""
     
+    # CivitAI LoRAs with default
+    echo -e "${BLUE}CivitAI LoRAs:${NC}"
+    read -p "CivitAI LoRA IDs (optional): " input_loras
+    CIVITAI_LORAS=${input_loras:-""}
+    echo ""
+    
     # HuggingFace Models with default
     echo -e "${BLUE}HuggingFace Models:${NC}"
     read -p "HuggingFace repositories [flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev]: " input_hf
@@ -195,6 +201,11 @@ generate_template() {
       "description": "Comma-separated CivitAI model version IDs"
     },
     {
+      "key": "CIVITAI_LORAS",
+      "value": "$CIVITAI_LORAS",
+      "description": "Comma-separated CivitAI LoRA model version IDs"
+    },
+    {
       "key": "HUGGINGFACE_MODELS", 
       "value": "$HUGGINGFACE_MODELS",
       "description": "Comma-separated HuggingFace repository names"
@@ -255,6 +266,7 @@ print_summary() {
     echo ""
     echo -e "${BLUE}Model Configuration:${NC}"
     echo "  CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
+    echo "  CivitAI LoRAs: ${CIVITAI_LORAS:-'None specified'}"
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
@@ -371,9 +383,10 @@ deploy_template() {
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
   "ports": "8188/http,8080/http",
-  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
+  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- CivitAI LoRAs: $CIVITAI_LORAS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
+    {"key": "CIVITAI_LORAS", "value": "$CIVITAI_LORAS"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},

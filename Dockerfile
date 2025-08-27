@@ -74,6 +74,7 @@ RUN chmod +x /workspace/scripts/*.sh
 
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""
+ENV CIVITAI_LORAS=""
 ENV HUGGINGFACE_MODELS=""
 ENV CIVITAI_TOKEN=""
 ENV HF_TOKEN=""

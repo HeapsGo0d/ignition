@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.0.13",
+  "name": "Ignition ComfyUI v1.4.1",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v1.0.13",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v1.4.1",
   "ports": [
     {
       "privatePort": 8188,
@@ -25,12 +25,12 @@
   "environmentVariables": [
     {
       "key": "CIVITAI_MODELS",
-      "value": "138977",
+      "value": "1569593,919063,450105",
       "description": "Comma-separated CivitAI model version IDs"
     },
     {
       "key": "HUGGINGFACE_MODELS", 
-      "value": "black-forest-labs/FLUX.1-dev",
+      "value": "flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev",
       "description": "Comma-separated HuggingFace repository names"
     },
     {
@@ -50,7 +50,7 @@
     },
     {
       "key": "FILEBROWSER_PASSWORD",
-      "value": "runpod",
+      "value": "ignition_runpod_2024",
       "description": "Password for file browser access"
     },
     {

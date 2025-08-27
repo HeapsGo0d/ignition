@@ -10,6 +10,7 @@ COMFYUI_MODELS_DIR="${COMFYUI_MODELS_DIR:-$WORKSPACE_ROOT/ComfyUI/models}"
 
 # Environment variables
 export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
+export CIVITAI_LORAS="${CIVITAI_LORAS:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -53,9 +54,19 @@ check_if_downloads_needed() {
         hf_needed=true
     else
         # Check CivitAI downloads needed
-        if [[ -n "$CIVITAI_MODELS" ]]; then
-            local civitai_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
-            log "INFO" "📥 $civitai_count CivitAI models requested: $CIVITAI_MODELS" >&2
+        if [[ -n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS" ]]; then
+            local civitai_count=0
+            local lora_count=0
+            if [[ -n "$CIVITAI_MODELS" ]]; then
+                civitai_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
+            fi
+            if [[ -n "$CIVITAI_LORAS" ]]; then
+                lora_count=$(echo "$CIVITAI_LORAS" | tr ',' '\n' | wc -l)
+            fi
+            
+            log "INFO" "📥 CivitAI requested: $civitai_count models, $lora_count LoRAs" >&2
+            [[ -n "$CIVITAI_MODELS" ]] && log "INFO" "   Models: $CIVITAI_MODELS" >&2
+            [[ -n "$CIVITAI_LORAS" ]] && log "INFO" "   LoRAs: $CIVITAI_LORAS" >&2
             
             if [[ $model_count -eq 0 ]]; then
                 civitai_needed=true
@@ -101,14 +112,15 @@ download_models() {
     local download_needed=false
     
     # Start CivitAI downloads
-    if [[ -n "$CIVITAI_MODELS" && "$civitai_needed" == "true" ]]; then
+    if [[ (-n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS") && "$civitai_needed" == "true" ]]; then
         log "INFO" "$DOWNLOAD Starting CivitAI downloads..."
         download_needed=true
         
         python3 "$SCRIPT_DIR/download_civitai_simple.py" \
             --models "$CIVITAI_MODELS" \
+            --loras "$CIVITAI_LORAS" \
             --token "$CIVITAI_TOKEN" \
-            --output-dir "$COMFYUI_MODELS_DIR/checkpoints" &
+            --output-dir "$COMFYUI_MODELS_DIR" &
         
         civitai_pid=$!
         download_processes+=($civitai_pid)

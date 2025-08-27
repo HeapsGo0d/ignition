@@ -8,8 +8,10 @@ import os
 import sys
 import subprocess
 import argparse
+import requests
+import re
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 from urllib.parse import urlencode
 
 # Constants
@@ -39,6 +41,45 @@ def ensure_aria2():
     except (FileNotFoundError, subprocess.CalledProcessError):
         log('error', 'aria2c not found. Please install aria2.')
         return False
+
+def clean_filename(name: str, max_length: int = 50) -> str:
+    """Clean and truncate filename for filesystem safety."""
+    # Remove or replace invalid characters
+    clean_name = re.sub(r'[<>:"/\\|?*]', '', name)
+    clean_name = re.sub(r'[\s\-_]+', '_', clean_name.strip())
+    
+    # Truncate if too long
+    if len(clean_name) > max_length:
+        clean_name = clean_name[:max_length].rstrip('_')
+    
+    return clean_name
+
+def get_model_info(model_id: str, token: str = "") -> Dict:
+    """Fetch model info from CivitAI API."""
+    try:
+        headers = {}
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+        
+        response = requests.get(f"{CIVITAI_API_BASE}/v1/model-versions/{model_id}", 
+                              headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        log('warning', f'Failed to fetch model info for {model_id}: {e}')
+        return {}
+
+def generate_filename(model_id: str, token: str = "") -> str:
+    """Generate hybrid filename with model name and ID."""
+    model_info = get_model_info(model_id, token)
+    
+    if model_info and 'name' in model_info.get('model', {}):
+        model_name = model_info['model']['name']
+        clean_name = clean_filename(model_name, max_length=30)
+        return f"{clean_name}_{model_id}.safetensors"
+    else:
+        # Fallback to ID-only naming
+        return f"model_{model_id}.safetensors"
 
 def download_with_aria2(url: str, output_dir: Path, filename: str) -> bool:
     """Download file using aria2c."""
@@ -95,7 +136,7 @@ def download_civitai_model(model_id: str, output_dir: Path, token: str = "", fil
     
     # Generate filename if not provided
     if not filename:
-        filename = f"model_{model_id}.safetensors"
+        filename = generate_filename(model_id, token)
     elif not filename.endswith('.safetensors'):
         filename += '.safetensors'
     
@@ -121,10 +162,11 @@ def download_civitai_model(model_id: str, output_dir: Path, token: str = "", fil
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Simple CivitAI downloader for Ignition')
-    parser.add_argument('--models', required=True, help='Comma-separated list of model IDs')
+    parser.add_argument('--models', default='', help='Comma-separated list of model IDs (checkpoints)')
+    parser.add_argument('--loras', default='', help='Comma-separated list of LoRA model IDs')
     parser.add_argument('--token', default='', help='CivitAI API token')
-    parser.add_argument('--output-dir', default='/workspace/ComfyUI/models/checkpoints', 
-                        help='Output directory')
+    parser.add_argument('--output-dir', default='/workspace/ComfyUI/models', 
+                        help='Base ComfyUI models directory')
     
     args = parser.parse_args()
     
@@ -136,23 +178,42 @@ def main():
     else:
         log('info', f'Using CivitAI token: {token[:8]}...')
     
-    output_dir = Path(args.output_dir)
-    model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
+    base_output_dir = Path(args.output_dir)
     
-    if not model_ids:
-        log('error', 'No model IDs provided')
+    # Parse model IDs
+    model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
+    lora_ids = [lid.strip() for lid in args.loras.split(',') if lid.strip()]
+    
+    if not model_ids and not lora_ids:
+        log('error', 'No model or LoRA IDs provided')
         return 1
     
-    log('info', f'Starting download of {len(model_ids)} models to {output_dir}')
+    total_downloads = len(model_ids) + len(lora_ids)
+    log('info', f'Starting download of {total_downloads} items ({len(model_ids)} models, {len(lora_ids)} LoRAs)')
     
     success_count = 0
-    for model_id in model_ids:
-        if download_civitai_model(model_id, output_dir, token):
-            success_count += 1
-        else:
-            log('warning', f'Failed to download model {model_id}')
     
-    log('info', f'Downloaded {success_count}/{len(model_ids)} models successfully')
+    # Download regular models to checkpoints/
+    if model_ids:
+        checkpoints_dir = base_output_dir / 'checkpoints'
+        log('info', f'Downloading {len(model_ids)} models to {checkpoints_dir}')
+        for model_id in model_ids:
+            if download_civitai_model(model_id, checkpoints_dir, token):
+                success_count += 1
+            else:
+                log('warning', f'Failed to download model {model_id}')
+    
+    # Download LoRAs to loras/
+    if lora_ids:
+        loras_dir = base_output_dir / 'loras'
+        log('info', f'Downloading {len(lora_ids)} LoRAs to {loras_dir}')
+        for lora_id in lora_ids:
+            if download_civitai_model(lora_id, loras_dir, token):
+                success_count += 1
+            else:
+                log('warning', f'Failed to download LoRA {lora_id}')
+    
+    log('info', f'Downloaded {success_count}/{total_downloads} items successfully')
     return 0 if success_count > 0 else 1
 
 if __name__ == "__main__":

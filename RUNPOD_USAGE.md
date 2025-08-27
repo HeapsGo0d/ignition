@@ -20,7 +20,7 @@ Once your pod is running:
 - **ComfyUI**: `http://[your-pod-id]-8188.proxy.runpod.net`
 - **File Browser**: `http://[your-pod-id]-8080.proxy.runpod.net`
   - Username: `admin`
-  - Password: `runpod`
+  - Password: `ignition_runpod_2024`
 
 ## Environment Variables
 
@@ -28,7 +28,7 @@ Once your pod is running:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `CIVITAI_MODELS` | CivitAI model version IDs | `138977,46846,5616` |
-| `HUGGINGFACE_MODELS` | HuggingFace repo names | `black-forest-labs/FLUX.1-dev` |
+| `HUGGINGFACE_MODELS` | HuggingFace model keys | `flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev` |
 
 ### Optional Authentication  
 | Variable | Description | Get Token From |
@@ -50,7 +50,7 @@ Storage: Ephemeral volume (0GB; models redownload each start) (Container: 200GB 
 ### HuggingFace Repository IDs  
 1. Go to model repository
 2. Copy the full path from URL
-3. Example: `huggingface.co/black-forest-labs/FLUX.1-dev` → use `black-forest-labs/FLUX.1-dev`
+3. Example: For FLUX workflow use `flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev` (complete set with KREA variant)
 
 ## Startup Process
 
