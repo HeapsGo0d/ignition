@@ -151,6 +151,17 @@ download_models() {
         log "INFO" "Final model count: $final_count files"
         log "INFO" "Download summary: $success_count/$total_processes processes succeeded"
         
+        # Show per-provider breakdown
+        local civitai_status="N/A"
+        local hf_status="N/A"
+        if [[ -n "$CIVITAI_MODELS" ]]; then
+            civitai_status="Attempted"
+        fi
+        if [[ -n "$HUGGINGFACE_MODELS" ]]; then
+            hf_status="Attempted"
+        fi
+        log "INFO" "Per-provider status: CivitAI=$civitai_status, HuggingFace=$hf_status"
+        
         if [[ $success_count -eq $total_processes ]]; then
             log "INFO" "$SUCCESS All downloads completed successfully"
             return 0

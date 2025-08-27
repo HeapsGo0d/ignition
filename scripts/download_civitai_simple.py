@@ -131,6 +131,11 @@ def main():
     # Get token from environment if not provided
     token = args.token or os.getenv('CIVITAI_TOKEN', '')
     
+    if not token:
+        log('warning', 'No CIVITAI_TOKEN provided - downloads may fail for gated models')
+    else:
+        log('info', f'Using CivitAI token: {token[:8]}...')
+    
     output_dir = Path(args.output_dir)
     model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
     
