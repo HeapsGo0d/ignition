@@ -11,6 +11,8 @@ COMFYUI_MODELS_DIR="${COMFYUI_MODELS_DIR:-$WORKSPACE_ROOT/ComfyUI/models}"
 # Environment variables
 export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export CIVITAI_LORAS="${CIVITAI_LORAS:-}"
+export CIVITAI_VAES="${CIVITAI_VAES:-}"
+export CIVITAI_FLUX="${CIVITAI_FLUX:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -54,19 +56,29 @@ check_if_downloads_needed() {
         hf_needed=true
     else
         # Check CivitAI downloads needed
-        if [[ -n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS" ]]; then
+        if [[ -n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS" || -n "$CIVITAI_VAES" || -n "$CIVITAI_FLUX" ]]; then
             local civitai_count=0
             local lora_count=0
+            local vae_count=0
+            local flux_count=0
             if [[ -n "$CIVITAI_MODELS" ]]; then
                 civitai_count=$(echo "$CIVITAI_MODELS" | tr ',' '\n' | wc -l)
             fi
             if [[ -n "$CIVITAI_LORAS" ]]; then
                 lora_count=$(echo "$CIVITAI_LORAS" | tr ',' '\n' | wc -l)
             fi
+            if [[ -n "$CIVITAI_VAES" ]]; then
+                vae_count=$(echo "$CIVITAI_VAES" | tr ',' '\n' | wc -l)
+            fi
+            if [[ -n "$CIVITAI_FLUX" ]]; then
+                flux_count=$(echo "$CIVITAI_FLUX" | tr ',' '\n' | wc -l)
+            fi
             
-            log "INFO" "📥 CivitAI requested: $civitai_count models, $lora_count LoRAs" >&2
+            log "INFO" "📥 CivitAI requested: $civitai_count models, $lora_count LoRAs, $vae_count VAEs, $flux_count FLUX" >&2
             [[ -n "$CIVITAI_MODELS" ]] && log "INFO" "   Models: $CIVITAI_MODELS" >&2
             [[ -n "$CIVITAI_LORAS" ]] && log "INFO" "   LoRAs: $CIVITAI_LORAS" >&2
+            [[ -n "$CIVITAI_VAES" ]] && log "INFO" "   VAEs: $CIVITAI_VAES" >&2
+            [[ -n "$CIVITAI_FLUX" ]] && log "INFO" "   FLUX: $CIVITAI_FLUX" >&2
             
             if [[ $model_count -eq 0 ]]; then
                 civitai_needed=true
@@ -112,13 +124,15 @@ download_models() {
     local download_needed=false
     
     # Start CivitAI downloads
-    if [[ (-n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS") && "$civitai_needed" == "true" ]]; then
+    if [[ (-n "$CIVITAI_MODELS" || -n "$CIVITAI_LORAS" || -n "$CIVITAI_VAES" || -n "$CIVITAI_FLUX") && "$civitai_needed" == "true" ]]; then
         log "INFO" "$DOWNLOAD Starting CivitAI downloads..."
         download_needed=true
         
         python3 "$SCRIPT_DIR/download_civitai_simple.py" \
             --models "$CIVITAI_MODELS" \
             --loras "$CIVITAI_LORAS" \
+            --vaes "$CIVITAI_VAES" \
+            --flux "$CIVITAI_FLUX" \
             --token "$CIVITAI_TOKEN" \
             --output-dir "$COMFYUI_MODELS_DIR" &
         

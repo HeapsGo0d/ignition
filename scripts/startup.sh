@@ -52,6 +52,8 @@ log() {
 # Environment variable defaults
 export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export CIVITAI_LORAS="${CIVITAI_LORAS:-}"
+export CIVITAI_VAES="${CIVITAI_VAES:-}"
+export CIVITAI_FLUX="${CIVITAI_FLUX:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -74,6 +76,8 @@ print_config() {
     log "INFO" "📋 Configuration:"
     log "INFO" "  • CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
     log "INFO" "  • CivitAI LoRAs: ${CIVITAI_LORAS:-'None specified'}"
+    log "INFO" "  • CivitAI VAEs: ${CIVITAI_VAES:-'None specified'}"
+    log "INFO" "  • CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     log "INFO" "  • HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     log "INFO" "  • Storage: RunPod volume (/workspace)"
     log "INFO" "  • ComfyUI Port: $COMFYUI_PORT"

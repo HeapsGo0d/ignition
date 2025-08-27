@@ -164,6 +164,8 @@ def main():
     parser = argparse.ArgumentParser(description='Simple CivitAI downloader for Ignition')
     parser.add_argument('--models', default='', help='Comma-separated list of model IDs (checkpoints)')
     parser.add_argument('--loras', default='', help='Comma-separated list of LoRA model IDs')
+    parser.add_argument('--vaes', default='', help='Comma-separated list of VAE model IDs')
+    parser.add_argument('--flux', default='', help='Comma-separated list of FLUX model IDs')
     parser.add_argument('--token', default='', help='CivitAI API token')
     parser.add_argument('--output-dir', default='/workspace/ComfyUI/models', 
                         help='Base ComfyUI models directory')
@@ -183,13 +185,15 @@ def main():
     # Parse model IDs
     model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
     lora_ids = [lid.strip() for lid in args.loras.split(',') if lid.strip()]
+    vae_ids = [vid.strip() for vid in args.vaes.split(',') if vid.strip()]
+    flux_ids = [fid.strip() for fid in args.flux.split(',') if fid.strip()]
     
-    if not model_ids and not lora_ids:
-        log('error', 'No model or LoRA IDs provided')
+    if not model_ids and not lora_ids and not vae_ids and not flux_ids:
+        log('error', 'No model, LoRA, VAE, or FLUX IDs provided')
         return 1
     
-    total_downloads = len(model_ids) + len(lora_ids)
-    log('info', f'Starting download of {total_downloads} items ({len(model_ids)} models, {len(lora_ids)} LoRAs)')
+    total_downloads = len(model_ids) + len(lora_ids) + len(vae_ids) + len(flux_ids)
+    log('info', f'Starting download of {total_downloads} items ({len(model_ids)} models, {len(lora_ids)} LoRAs, {len(vae_ids)} VAEs, {len(flux_ids)} FLUX)')
     
     success_count = 0
     
@@ -212,6 +216,26 @@ def main():
                 success_count += 1
             else:
                 log('warning', f'Failed to download LoRA {lora_id}')
+    
+    # Download VAEs to vae/
+    if vae_ids:
+        vaes_dir = base_output_dir / 'vae'
+        log('info', f'Downloading {len(vae_ids)} VAEs to {vaes_dir}')
+        for vae_id in vae_ids:
+            if download_civitai_model(vae_id, vaes_dir, token):
+                success_count += 1
+            else:
+                log('warning', f'Failed to download VAE {vae_id}')
+    
+    # Download FLUX models to diffusion_models/
+    if flux_ids:
+        flux_dir = base_output_dir / 'diffusion_models'
+        log('info', f'Downloading {len(flux_ids)} FLUX models to {flux_dir}')
+        for flux_id in flux_ids:
+            if download_civitai_model(flux_id, flux_dir, token):
+                success_count += 1
+            else:
+                log('warning', f'Failed to download FLUX model {flux_id}')
     
     log('info', f'Downloaded {success_count}/{total_downloads} items successfully')
     return 0 if success_count > 0 else 1

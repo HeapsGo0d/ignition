@@ -129,14 +129,26 @@ get_configuration() {
     
     # CivitAI Models with default
     echo -e "${BLUE}CivitAI Models:${NC}"
-    read -p "CivitAI model IDs [138977,46846]: " input_civitai
-    CIVITAI_MODELS=${input_civitai:-"138977,46846"}
+    read -p "CivitAI model IDs [1569593,919063,450105]: " input_civitai
+    CIVITAI_MODELS=${input_civitai:-"1569593,919063,450105"}
     echo ""
     
     # CivitAI LoRAs with default
     echo -e "${BLUE}CivitAI LoRAs:${NC}"
-    read -p "CivitAI LoRA IDs (optional): " input_loras
-    CIVITAI_LORAS=${input_loras:-""}
+    read -p "CivitAI LoRA IDs [182404,445135,86788,565308]: " input_loras
+    CIVITAI_LORAS=${input_loras:-"182404,445135,86788,565308"}
+    echo ""
+    
+    # CivitAI VAEs with default
+    echo -e "${BLUE}CivitAI VAEs:${NC}"
+    read -p "CivitAI VAE IDs [1674314]: " input_vaes
+    CIVITAI_VAES=${input_vaes:-"1674314"}
+    echo ""
+    
+    # CivitAI FLUX with default
+    echo -e "${BLUE}CivitAI FLUX Models:${NC}"
+    read -p "CivitAI FLUX model IDs [153568]: " input_flux
+    CIVITAI_FLUX=${input_flux:-"153568"}
     echo ""
     
     # HuggingFace Models with default
@@ -206,6 +218,16 @@ generate_template() {
       "description": "Comma-separated CivitAI LoRA model version IDs"
     },
     {
+      "key": "CIVITAI_VAES",
+      "value": "$CIVITAI_VAES",
+      "description": "Comma-separated CivitAI VAE model version IDs"
+    },
+    {
+      "key": "CIVITAI_FLUX",
+      "value": "$CIVITAI_FLUX",
+      "description": "Comma-separated CivitAI FLUX model version IDs"
+    },
+    {
       "key": "HUGGINGFACE_MODELS", 
       "value": "$HUGGINGFACE_MODELS",
       "description": "Comma-separated HuggingFace repository names"
@@ -267,6 +289,8 @@ print_summary() {
     echo -e "${BLUE}Model Configuration:${NC}"
     echo "  CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
     echo "  CivitAI LoRAs: ${CIVITAI_LORAS:-'None specified'}"
+    echo "  CivitAI VAEs: ${CIVITAI_VAES:-'None specified'}"
+    echo "  CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
@@ -387,6 +411,8 @@ deploy_template() {
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "CIVITAI_LORAS", "value": "$CIVITAI_LORAS"},
+    {"key": "CIVITAI_VAES", "value": "$CIVITAI_VAES"},
+    {"key": "CIVITAI_FLUX", "value": "$CIVITAI_FLUX"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},

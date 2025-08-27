@@ -20,7 +20,7 @@ Once your pod is running:
 - **ComfyUI**: `http://[your-pod-id]-8188.proxy.runpod.net`
 - **File Browser**: `http://[your-pod-id]-8080.proxy.runpod.net`
   - Username: `admin`
-  - Password: `ignition_runpod_2024`
+  - Password: `runpod`
 
 ## Environment Variables
 
