@@ -135,8 +135,8 @@ get_configuration() {
     
     # HuggingFace Models with default
     echo -e "${BLUE}HuggingFace Models:${NC}"
-    read -p "HuggingFace repositories [black-forest-labs/FLUX.1-dev]: " input_hf
-    HUGGINGFACE_MODELS=${input_hf:-"black-forest-labs/FLUX.1-dev"}
+    read -p "HuggingFace repositories [flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev]: " input_hf
+    HUGGINGFACE_MODELS=${input_hf:-"flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev"}
     echo ""
     
     # Security settings with default
@@ -297,7 +297,7 @@ Once your pod is running:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | \`CIVITAI_MODELS\` | CivitAI model version IDs | \`138977,46846,5616\` |
-| \`HUGGINGFACE_MODELS\` | HuggingFace repo names | \`black-forest-labs/FLUX.1-dev\` |
+| \`HUGGINGFACE_MODELS\` | HuggingFace model keys | \`flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev\` |
 
 ### Optional Authentication  
 | Variable | Description | Get Token From |
@@ -319,7 +319,7 @@ Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_
 ### HuggingFace Repository IDs  
 1. Go to model repository
 2. Copy the full path from URL
-3. Example: \`huggingface.co/black-forest-labs/FLUX.1-dev\` → use \`black-forest-labs/FLUX.1-dev\`
+3. Example: For FLUX workflow use \`flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev\` (complete set with KREA variant)
 
 ## Startup Process
 

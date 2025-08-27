@@ -51,6 +51,11 @@ FLUX_MODELS = {
         'url': 'https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors',
         'filename': 'ae.safetensors',
         'subdir': 'vae'
+    },
+    'flux1-krea-dev': {
+        'url': 'https://huggingface.co/Comfy-Org/flux1-krea-dev/resolve/main/flux1-krea-dev_fp8_scaled.safetensors',
+        'filename': 'flux1-krea-dev_fp8_scaled.safetensors',
+        'subdir': 'diffusion_models'
     }
 }
 
