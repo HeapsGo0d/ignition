@@ -142,14 +142,50 @@ def normalize_flux_key(model_input: str) -> str:
     # Default fallback
     return model_input
 
-def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") -> bool:
-    """Download a specific FLUX model to the correct ComfyUI directory structure."""
+def parse_generic_repo(model_input: str) -> dict:
+    """Parse generic HuggingFace repo format: repo:filename:subdir[:branch]"""
+    parts = model_input.split(':')
+    if len(parts) < 3:
+        return None
+        
+    repo = parts[0]
+    filename = parts[1] 
+    subdir = parts[2]
+    branch = parts[3] if len(parts) > 3 else 'main'
     
-    if model_key not in FLUX_MODELS:
-        log('error', f'Unknown FLUX model: {model_key}. Available: {", ".join(FLUX_MODELS.keys())}')
+    url = f"https://huggingface.co/{repo}/resolve/{branch}/{filename}"
+    
+    return {
+        'url': url,
+        'filename': filename,
+        'subdir': subdir
+    }
+
+def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") -> bool:
+    """Download a FLUX model - supports both predefined models and generic HF repos."""
+    
+    model_info = None
+    
+    # Check if it's a predefined model
+    if model_key in FLUX_MODELS:
+        model_info = FLUX_MODELS[model_key]
+        log('info', f'Downloading predefined FLUX model: {model_key}')
+    
+    # Check if it's a generic repo format (contains colons)
+    elif ':' in model_key:
+        model_info = parse_generic_repo(model_key)
+        if model_info:
+            log('info', f'Downloading generic HuggingFace model: {model_key}')
+        else:
+            log('error', f'Invalid generic repo format: {model_key}. Use: repo:filename:subdir[:branch]')
+            return False
+    
+    # Unknown model
+    else:
+        log('error', f'Unknown FLUX model: {model_key}. Available predefined: {", ".join(FLUX_MODELS.keys())}')
+        log('info', f'Or use generic format: repo:filename:subdir[:branch]')
         return False
     
-    model_info = FLUX_MODELS[model_key]
     url = model_info['url']
     filename = model_info['filename']
     subdir = model_info['subdir']
@@ -157,13 +193,13 @@ def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") 
     # Create the proper subdirectory
     target_dir = base_output_dir / subdir
     
-    log('info', f'Downloading FLUX model: {model_key} to {subdir}/')
+    log('info', f'Target directory: {subdir}/')
     return download_with_aria2(url, target_dir, filename, token)
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Simple HuggingFace downloader for Ignition using Hearmeman\'s approach')
-    parser.add_argument('--repos', required=True, help='Comma-separated list of FLUX model keys: flux1-dev,clip_l,t5xxl_fp8,ae')
+    parser.add_argument('--repos', required=True, help='Comma-separated list of FLUX model keys. Predefined: flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev. Generic format: repo:filename:subdir[:branch]')
     parser.add_argument('--token', default='', help='HuggingFace API token')
     parser.add_argument('--output-dir', default='/workspace/ComfyUI/models', 
                         help='Base ComfyUI models directory')
