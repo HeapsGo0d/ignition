@@ -42,6 +42,12 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI &
     cd /workspace/ComfyUI && \
     pip install --no-cache-dir -r requirements.txt
 
+# Install ComfyUI-Manager for custom node management
+RUN cd /workspace/ComfyUI/custom_nodes && \
+    git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
+    cd ComfyUI-Manager && \
+    pip install --no-cache-dir -r requirements.txt
+
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \
