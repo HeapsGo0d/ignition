@@ -19,10 +19,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install additional system dependencies including aria2 for downloads
+# Install additional system dependencies including aria2 for downloads and privacy tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ffmpeg git aria2 git-lfs wget vim \
     libgl1-mesa-glx libglib2.0-0 \
+    iptables netstat-nat net-tools iproute2 \
+    dnsutils psmisc procps \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Core Python tooling (PyTorch already included in base image)

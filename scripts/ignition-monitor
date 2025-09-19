@@ -1,0 +1,3 @@
+#!/bin/bash
+# Ignition Monitor - Alias for ignition-privacy monitor
+exec "$(dirname "$0")/ignition-privacy" monitor "$@"

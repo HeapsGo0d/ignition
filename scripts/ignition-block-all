@@ -1,0 +1,3 @@
+#!/bin/bash
+# Ignition Block All - Alias for ignition-privacy block-all
+exec "$(dirname "$0")/ignition-privacy" block-all "$@"

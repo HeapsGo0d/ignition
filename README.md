@@ -215,18 +215,99 @@ python3 scripts/download_civitai.py --models "123456" --token "your_token"
 python3 scripts/download_huggingface.py --repos "black-forest-labs/FLUX.1-dev"
 ```
 
+## 🛡️ Privacy Protection
+
+Ignition includes comprehensive privacy protection to block telemetry and unwanted external connections while preserving essential functionality.
+
+### **Privacy Features**
+
+- **Smart Blocking**: Automatically blocks telemetry and external AI services
+- **Download Protection**: Never interrupts model downloads from CivitAI/HuggingFace
+- **Phased Blocking**: Permissive startup, strict runtime blocking
+- **Real-time Monitoring**: Track all outbound connections
+- **Manual Control**: Terminal commands for runtime adjustment
+
+### **Privacy Configuration**
+
+Control privacy features with environment variables:
+
+```bash
+# Privacy Control
+PRIVACY_ENABLED=true          # Enable/disable privacy protection
+BLOCK_TELEMETRY=true         # Block analytics and telemetry
+BLOCK_AI_SERVICES=true       # Block external AI APIs (OpenAI, etc.)
+MONITORING_ONLY=false        # Monitor only, don't block
+DOWNLOAD_GRACE_PERIOD=300    # Seconds to protect downloads
+```
+
+### **What Gets Blocked**
+
+**Always Blocked:**
+- Analytics and telemetry services
+- External AI APIs (OpenAI, Google, Black Forest Labs, etc.)
+- Tracking and metrics endpoints
+
+**Always Allowed:**
+- CivitAI and HuggingFace (model downloads)
+- Local connections (127.0.0.1)
+
+**Startup Only:**
+- GitHub (for extension updates during initialization)
+
+### **Terminal Commands**
+
+Monitor and control privacy during runtime:
+
+```bash
+# Check current status
+ignition-status
+
+# Real-time connection monitoring
+ignition-monitor
+
+# Emergency block all connections
+ignition-block-all
+
+# Temporarily allow a domain
+ignition-privacy allow github.com 600
+
+# Show connection summary
+ignition-privacy summary
+```
+
+### **Privacy States**
+
+The system transitions through different blocking states:
+
+1. **Startup** - Allow essential connections, block telemetry
+2. **Downloads Active** - Protect aria2c processes, allow model sources
+3. **Strict** - Only allow model downloads, block everything else
+4. **Emergency Block** - Block all external connections
+
+### **Download Protection**
+
+The system automatically detects and protects:
+- Any running aria2c processes (startup or user-initiated)
+- Active downloads to CivitAI/HuggingFace
+- Grace period after downloads complete (5 minutes default)
+
+**Your downloads will never be interrupted by privacy blocking.**
+
 ## 🔐 Security Notes
 
 - Use strong passwords for file browser access
 - Store API tokens securely in RunPod secrets
 - Consider network policies for production use
 - File browser provides admin access to container filesystem
+- Privacy protection helps prevent data leakage to external services
 
 ## 📝 Version History
 
 - **v1.0**: Initial release with CivitAI and HuggingFace support
 - **v1.1**: Enhanced error handling and progress monitoring
 - **v1.2**: Added persistent storage and file browser integration
+- **v1.8**: Major improvements - shared utilities, better validation, type hints
+- **v1.9**: Privacy protection system with smart blocking and download protection
 
 ## 🤝 Contributing
 

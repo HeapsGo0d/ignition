@@ -61,6 +61,12 @@ export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
+export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
+export BLOCK_TELEMETRY="${BLOCK_TELEMETRY:-true}"
+export BLOCK_AI_SERVICES="${BLOCK_AI_SERVICES:-true}"
+export MONITORING_ONLY="${MONITORING_ONLY:-false}"
+export DOWNLOAD_GRACE_PERIOD="${DOWNLOAD_GRACE_PERIOD:-300}"
+export STARTUP_SAFETY_BUFFER="${STARTUP_SAFETY_BUFFER:-300}"
 
 print_banner() {
     log "INFO" ""
@@ -82,6 +88,13 @@ print_config() {
     log "INFO" "  • Storage: RunPod volume (/workspace)"
     log "INFO" "  • ComfyUI Port: $COMFYUI_PORT"
     log "INFO" "  • File Browser Port: $FILEBROWSER_PORT"
+    log "INFO" ""
+    log "INFO" "🛡️ Privacy Configuration:"
+    log "INFO" "  • Privacy Protection: ${PRIVACY_ENABLED}"
+    log "INFO" "  • Block Telemetry: ${BLOCK_TELEMETRY}"
+    log "INFO" "  • Block AI Services: ${BLOCK_AI_SERVICES}"
+    log "INFO" "  • Monitoring Only: ${MONITORING_ONLY}"
+    log "INFO" "  • Download Grace Period: ${DOWNLOAD_GRACE_PERIOD}s"
     log "INFO" ""
 }
 
@@ -234,9 +247,53 @@ start_comfyui() {
     exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
 }
 
+initialize_privacy() {
+    log "INFO" "🛡️ Initializing privacy protection..."
+
+    if [[ "$PRIVACY_ENABLED" != "true" ]]; then
+        log "INFO" "  • Privacy protection disabled"
+        return
+    fi
+
+    # Start download protector in background
+    log "INFO" "  • Starting download protector"
+    "$SCRIPT_DIR/download_protector.sh" monitor &
+
+    # Start connection monitor if not in monitoring only mode
+    if [[ "$MONITORING_ONLY" == "true" ]]; then
+        log "INFO" "  • Starting connection monitor (monitoring only)"
+        "$SCRIPT_DIR/connection_monitor.sh" start &
+    else
+        log "INFO" "  • Starting connection monitor with blocking"
+        "$SCRIPT_DIR/connection_monitor.sh" start &
+    fi
+
+    # Start privacy state manager in background
+    log "INFO" "  • Starting privacy state manager"
+    "$PYBIN" "$SCRIPT_DIR/privacy_state_manager.py" monitor &
+
+    # Give privacy system time to initialize
+    sleep 2
+
+    log "INFO" "✅ Privacy protection initialized"
+    log "INFO" ""
+}
+
 # Signal handlers
 cleanup() {
     log "INFO" "🛑 Shutting down Ignition..."
+
+    # Stop privacy system
+    if [[ "$PRIVACY_ENABLED" == "true" ]]; then
+        log "INFO" "  • Stopping privacy protection"
+        pkill -f "download_protector.sh" 2>/dev/null || true
+        pkill -f "connection_monitor.sh" 2>/dev/null || true
+        pkill -f "privacy_state_manager.py" 2>/dev/null || true
+
+        # Clear iptables rules
+        iptables -F OUTPUT 2>/dev/null || true
+    fi
+
     jobs -p | xargs -r kill 2>/dev/null || true
     exit 0
 }
@@ -248,6 +305,7 @@ main() {
     print_banner
     print_config
     check_system
+    initialize_privacy
     setup_storage
     download_models
     start_filebrowser

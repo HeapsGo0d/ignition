@@ -1,0 +1,3 @@
+#!/bin/bash
+# Ignition Status - Alias for ignition-privacy status
+exec "$(dirname "$0")/ignition-privacy" status "$@"

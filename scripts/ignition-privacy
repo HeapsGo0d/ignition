@@ -1,0 +1,219 @@
+#!/bin/bash
+# Ignition Privacy Control Commands
+# Terminal interface for privacy blocking system
+
+set -euo pipefail
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Status indicators
+SUCCESS='✅'
+ERROR='❌'
+WARNING='⚠️'
+INFO='🔍'
+PRIVACY='🛡️'
+DOWNLOAD='📥'
+BLOCK='🚫'
+MONITOR='📊'
+
+log() {
+    local level=$1
+    shift
+    local message="$@"
+    local timestamp=$(date '+%H:%M:%S')
+    echo "[$timestamp] $message"
+}
+
+# Show current privacy system status
+show_status() {
+    echo "=== Ignition Privacy Status ==="
+    echo ""
+
+    # Check if privacy is enabled
+    if [[ "${PRIVACY_ENABLED:-true}" != "true" ]]; then
+        echo "$WARNING Privacy protection is DISABLED"
+        return
+    fi
+
+    # Get privacy state manager status
+    if command -v python3 >/dev/null 2>&1; then
+        echo "$INFO Privacy State:"
+        python3 "$SCRIPT_DIR/privacy_state_manager.py" status 2>/dev/null | jq -r '
+            "  State: " + .state,
+            "  ComfyUI Ready: " + (.comfyui_ready | tostring),
+            "  Uptime: " + (.uptime | tostring | split(".")[0]) + "s"
+        ' 2>/dev/null || echo "  Status unavailable"
+        echo ""
+    fi
+
+    # Get download protection status
+    echo "$DOWNLOAD Download Protection:"
+    if [[ -x "$SCRIPT_DIR/download_protector.sh" ]]; then
+        "$SCRIPT_DIR/download_protector.sh" status
+    else
+        echo "  Download protector not available"
+    fi
+    echo ""
+
+    # Get connection monitoring status
+    echo "$MONITOR Connection Monitoring:"
+    if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
+        "$SCRIPT_DIR/connection_monitor.sh" status
+        echo "  Recent connections:"
+        "$SCRIPT_DIR/connection_monitor.sh" recent 5 | sed 's/^/    /'
+    else
+        echo "  Connection monitor not available"
+    fi
+}
+
+# Show real-time connection monitoring
+monitor_connections() {
+    echo "$MONITOR Starting real-time connection monitoring..."
+    echo "Press Ctrl+C to exit"
+    echo ""
+
+    if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
+        "$SCRIPT_DIR/connection_monitor.sh" realtime
+    else
+        echo "$ERROR Connection monitor not available"
+        exit 1
+    fi
+}
+
+# Show connection summary
+show_summary() {
+    echo "=== Connection Summary ==="
+    echo ""
+
+    if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
+        "$SCRIPT_DIR/connection_monitor.sh" summary
+    else
+        echo "$ERROR Connection monitor not available"
+    fi
+}
+
+# Block all connections immediately (emergency mode)
+emergency_block() {
+    echo "$BLOCK Activating emergency block mode..."
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 "$SCRIPT_DIR/privacy_state_manager.py" emergency-block
+        echo "$SUCCESS Emergency block activated"
+    else
+        echo "$ERROR Privacy state manager not available"
+        exit 1
+    fi
+}
+
+# Temporarily allow a domain
+allow_domain() {
+    local domain="$1"
+    local duration="${2:-300}"
+
+    echo "$INFO Temporarily allowing $domain for ${duration}s..."
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 "$SCRIPT_DIR/privacy_state_manager.py" allow "$domain" "$duration"
+        echo "$SUCCESS Domain temporarily allowed"
+    else
+        echo "$ERROR Privacy state manager not available"
+        exit 1
+    fi
+}
+
+# Show download status
+download_status() {
+    echo "=== Download Status ==="
+    echo ""
+
+    if [[ -x "$SCRIPT_DIR/download_protector.sh" ]]; then
+        "$SCRIPT_DIR/download_protector.sh" details
+    else
+        echo "$ERROR Download protector not available"
+    fi
+}
+
+# Test domain classification
+test_domains() {
+    echo "=== Domain Classification Test ==="
+    echo ""
+
+    if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
+        "$SCRIPT_DIR/connection_monitor.sh" test
+    else
+        echo "$ERROR Connection monitor not available"
+    fi
+}
+
+# Show help
+show_help() {
+    echo "Ignition Privacy Control Commands"
+    echo ""
+    echo "Usage: ignition-privacy <command> [args]"
+    echo ""
+    echo "Commands:"
+    echo "  status              Show current privacy system status"
+    echo "  monitor             Show real-time connection monitoring"
+    echo "  summary             Show connection summary and statistics"
+    echo "  downloads           Show active download status"
+    echo "  block-all           Emergency block all connections"
+    echo "  allow <domain> [s]  Temporarily allow domain (default: 300s)"
+    echo "  test                Test domain classification"
+    echo "  help                Show this help message"
+    echo ""
+    echo "Aliases:"
+    echo "  ignition-status     = ignition-privacy status"
+    echo "  ignition-monitor    = ignition-privacy monitor"
+    echo "  ignition-block-all  = ignition-privacy block-all"
+    echo ""
+    echo "Examples:"
+    echo "  ignition-privacy status"
+    echo "  ignition-privacy monitor"
+    echo "  ignition-privacy allow github.com 600"
+    echo "  ignition-privacy block-all"
+}
+
+# Main command dispatcher
+main() {
+    local command="${1:-status}"
+
+    case "$command" in
+        "status")
+            show_status
+            ;;
+        "monitor"|"realtime"|"live")
+            monitor_connections
+            ;;
+        "summary"|"stats")
+            show_summary
+            ;;
+        "downloads"|"download-status")
+            download_status
+            ;;
+        "block-all"|"emergency"|"emergency-block")
+            emergency_block
+            ;;
+        "allow"|"whitelist")
+            if [[ $# -lt 2 ]]; then
+                echo "$ERROR Usage: ignition-privacy allow <domain> [duration]"
+                exit 1
+            fi
+            allow_domain "$2" "${3:-300}"
+            ;;
+        "test"|"test-domains")
+            test_domains
+            ;;
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        *)
+            echo "$ERROR Unknown command: $command"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
