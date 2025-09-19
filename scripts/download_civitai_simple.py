@@ -6,7 +6,6 @@ Uses aria2c for reliable downloads with fallback strategies.
 
 import os
 import sys
-import subprocess
 import argparse
 import requests
 import re
@@ -14,33 +13,11 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from urllib.parse import urlencode
 
+# Import shared utilities
+from download_utils import log, download_with_aria2
+
 # Constants
 CIVITAI_API_BASE = "https://civitai.com/api"
-ARIA2_CONNECTIONS = 4  # Conservative for container environments
-ARIA2_SPLITS = 4
-PROGRESS_INTERVAL = 5
-
-# Status indicators
-STATUS = {
-    'success': '✅',
-    'error': '❌', 
-    'warning': '⚠️',
-    'info': '🔍',
-    'download': '📥'
-}
-
-def log(level: str, message: str):
-    """Simple logging function matching startup.sh style."""
-    print(f"{STATUS.get(level, '')} {message}")
-
-def ensure_aria2():
-    """Check if aria2c is available."""
-    try:
-        subprocess.run(['aria2c', '--version'], capture_output=True, check=True)
-        return True
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        log('error', 'aria2c not found. Please install aria2.')
-        return False
 
 def clean_filename(name: str, max_length: int = 50) -> str:
     """Clean and truncate filename for filesystem safety."""
@@ -81,48 +58,6 @@ def generate_filename(model_id: str, token: str = "") -> str:
         # Fallback to ID-only naming
         return f"model_{model_id}.safetensors"
 
-def download_with_aria2(url: str, output_dir: Path, filename: str) -> bool:
-    """Download file using aria2c."""
-    if not ensure_aria2():
-        return False
-    
-    output_dir.mkdir(parents=True, exist_ok=True)
-    file_path = output_dir / filename
-    
-    # Remove existing file to avoid conflicts
-    if file_path.exists():
-        file_path.unlink()
-    
-    cmd = [
-        'aria2c',
-        f'--max-connection-per-server={ARIA2_CONNECTIONS}',
-        f'--split={ARIA2_SPLITS}',
-        '--continue=true',
-        '--auto-file-renaming=false',
-        '--allow-overwrite=true',
-        f'--summary-interval={PROGRESS_INTERVAL}',
-        '--console-log-level=warn',
-        f'--dir={output_dir}',
-        f'--out={filename}',
-        url
-    ]
-    
-    log('download', f'Downloading {filename}...')
-    
-    try:
-        result = subprocess.run(cmd, check=False, capture_output=False)
-        
-        # Check if file was downloaded
-        if file_path.exists() and file_path.stat().st_size > 1024 * 1024:  # At least 1MB
-            log('success', f'Downloaded {filename} ({file_path.stat().st_size // (1024*1024)}MB)')
-            return True
-        else:
-            log('error', f'Download failed or file too small: {filename}')
-            return False
-            
-    except Exception as e:
-        log('error', f'Download error: {e}')
-        return False
 
 def download_civitai_model(model_id: str, output_dir: Path, token: str = "", filename: str = "") -> bool:
     """Download a CivitAI model with fallback strategies."""
