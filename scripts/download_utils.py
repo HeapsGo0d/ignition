@@ -5,6 +5,7 @@ Common functions for aria2c downloads, logging, and file operations.
 """
 
 import subprocess
+import re
 from pathlib import Path
 
 # Constants - standardized across all downloaders
@@ -82,3 +83,92 @@ def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = 
     except Exception as e:
         log('error', f'Download error: {e}')
         return False
+
+def validate_civitai_model_id(model_id: str) -> bool:
+    """Validate CivitAI model ID format and range."""
+    if not model_id or not model_id.strip():
+        log('error', f'Empty model ID provided')
+        return False
+
+    model_id = model_id.strip()
+
+    # Must be numeric
+    if not model_id.isdigit():
+        log('error', f'Invalid CivitAI model ID: "{model_id}" - must be numeric')
+        return False
+
+    # Reasonable range check
+    model_num = int(model_id)
+    if model_num <= 0:
+        log('error', f'Invalid CivitAI model ID: "{model_id}" - must be positive')
+        return False
+
+    if model_num > 10000000:  # 10 million seems reasonable upper bound
+        log('error', f'Invalid CivitAI model ID: "{model_id}" - too large (>10M)')
+        return False
+
+    return True
+
+def validate_huggingface_repo(repo: str) -> bool:
+    """Validate HuggingFace repository format."""
+    if not repo or not repo.strip():
+        log('error', f'Empty repository name provided')
+        return False
+
+    repo = repo.strip()
+
+    # Check for predefined models (single words)
+    predefined_models = ['flux1-dev', 'clip_l', 't5xxl_fp16', 't5xxl_fp8', 'ae', 'flux1-krea-dev']
+    if repo in predefined_models:
+        return True
+
+    # Check generic repo format: repo:filename:subdir[:branch] or user/repo format
+    if ':' in repo:
+        parts = repo.split(':')
+        if len(parts) < 3:
+            log('error', f'Invalid HF repo format: "{repo}" - use repo:filename:subdir[:branch]')
+            return False
+        return True
+
+    # Check standard HF repo format: username/repository
+    if '/' not in repo:
+        log('error', f'Invalid HF repo format: "{repo}" - use username/repository or predefined model')
+        return False
+
+    # Basic username/repo validation
+    parts = repo.split('/')
+    if len(parts) != 2 or not all(part.strip() for part in parts):
+        log('error', f'Invalid HF repo format: "{repo}" - use username/repository')
+        return False
+
+    # Check for valid characters (basic validation)
+    username, reponame = parts
+    if not re.match(r'^[a-zA-Z0-9._-]+$', username) or not re.match(r'^[a-zA-Z0-9._-]+$', reponame):
+        log('error', f'Invalid HF repo format: "{repo}" - contains invalid characters')
+        return False
+
+    return True
+
+def validate_models_list(models_str: str, validator_func, model_type: str) -> list:
+    """Validate and parse comma-separated model list."""
+    if not models_str or not models_str.strip():
+        return []
+
+    valid_models = []
+    invalid_count = 0
+
+    models = [m.strip() for m in models_str.split(',') if m.strip()]
+
+    for model in models:
+        if validator_func(model):
+            valid_models.append(model)
+        else:
+            invalid_count += 1
+
+    if invalid_count > 0:
+        log('warning', f'{invalid_count} invalid {model_type} model IDs skipped')
+
+    if valid_models:
+        log('info', f'Validated {len(valid_models)} {model_type} models: {", ".join(valid_models[:3])}{"..." if len(valid_models) > 3 else ""}')
+
+    return valid_models

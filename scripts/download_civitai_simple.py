@@ -14,7 +14,7 @@ from typing import Optional, List, Dict
 from urllib.parse import urlencode
 
 # Import shared utilities
-from download_utils import log, download_with_aria2
+from download_utils import log, download_with_aria2, validate_civitai_model_id, validate_models_list
 
 # Constants
 CIVITAI_API_BASE = "https://civitai.com/api"
@@ -42,8 +42,19 @@ def get_model_info(model_id: str, token: str = "") -> Dict:
                               headers=headers, timeout=10)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            log('warning', f'Model {model_id}: Authentication failed. Check CIVITAI_TOKEN')
+        elif e.response.status_code == 404:
+            log('warning', f'Model {model_id}: Not found. Verify model version ID')
+        else:
+            log('warning', f'Model {model_id}: HTTP {e.response.status_code} error')
+        return {}
+    except requests.exceptions.RequestException as e:
+        log('warning', f'Model {model_id}: Network error - {e}')
+        return {}
     except Exception as e:
-        log('warning', f'Failed to fetch model info for {model_id}: {e}')
+        log('warning', f'Model {model_id}: Unexpected error - {e}')
         return {}
 
 def generate_filename(model_id: str, token: str = "") -> str:
@@ -117,14 +128,15 @@ def main():
     
     base_output_dir = Path(args.output_dir)
     
-    # Parse model IDs
-    model_ids = [mid.strip() for mid in args.models.split(',') if mid.strip()]
-    lora_ids = [lid.strip() for lid in args.loras.split(',') if lid.strip()]
-    vae_ids = [vid.strip() for vid in args.vaes.split(',') if vid.strip()]
-    flux_ids = [fid.strip() for fid in args.flux.split(',') if fid.strip()]
-    
+    # Parse and validate model IDs
+    model_ids = validate_models_list(args.models, validate_civitai_model_id, 'checkpoint')
+    lora_ids = validate_models_list(args.loras, validate_civitai_model_id, 'LoRA')
+    vae_ids = validate_models_list(args.vaes, validate_civitai_model_id, 'VAE')
+    flux_ids = validate_models_list(args.flux, validate_civitai_model_id, 'FLUX')
+
     if not model_ids and not lora_ids and not vae_ids and not flux_ids:
-        log('error', 'No model, LoRA, VAE, or FLUX IDs provided')
+        log('error', 'No valid model IDs provided after validation')
+        log('info', 'CivitAI model IDs must be numeric (e.g., 123456)')
         return 1
     
     total_downloads = len(model_ids) + len(lora_ids) + len(vae_ids) + len(flux_ids)

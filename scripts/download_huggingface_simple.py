@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List
 
 # Import shared utilities
-from download_utils import log, download_with_aria2
+from download_utils import log, download_with_aria2, validate_huggingface_repo, validate_models_list
 
 # ComfyUI workflow FLUX model URLs with proper directory structure
 FLUX_MODELS = {
@@ -142,15 +142,17 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    model_inputs = [key.strip() for key in args.repos.split(',') if key.strip()]
-    
-    if not model_inputs:
-        log('error', 'No model inputs provided')
+    # Validate HuggingFace repository inputs
+    valid_model_inputs = validate_models_list(args.repos, validate_huggingface_repo, 'HuggingFace')
+
+    if not valid_model_inputs:
+        log('error', 'No valid HuggingFace models provided after validation')
+        log('info', 'Use format: username/repository or predefined models like flux1-dev')
         return 1
     
     # Normalize all inputs and expand multi-model repos
     all_model_keys = []
-    for model_input in model_inputs:
+    for model_input in valid_model_inputs:
         normalized = normalize_flux_key(model_input)
         if ',' in normalized:  # Multi-model repo like comfyanonymous/flux_text_encoders
             all_model_keys.extend([k.strip() for k in normalized.split(',')])
