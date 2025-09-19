@@ -10,7 +10,7 @@ import argparse
 import requests
 import re
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from urllib.parse import urlencode
 
 # Import shared utilities
@@ -31,10 +31,10 @@ def clean_filename(name: str, max_length: int = 50) -> str:
     
     return clean_name
 
-def get_model_info(model_id: str, token: str = "") -> Dict:
+def get_model_info(model_id: str, token: str = "") -> Dict[str, any]:
     """Fetch model info from CivitAI API."""
     try:
-        headers = {}
+        headers: Dict[str, str] = {}
         if token:
             headers['Authorization'] = f'Bearer {token}'
         
@@ -74,7 +74,7 @@ def download_civitai_model(model_id: str, output_dir: Path, token: str = "", fil
     """Download a CivitAI model with fallback strategies."""
     
     # Try SafeTensor format first
-    params = {'type': 'Model', 'format': 'SafeTensor'}
+    params: Dict[str, str] = {'type': 'Model', 'format': 'SafeTensor'}
     if token:
         params['token'] = token
     
@@ -105,7 +105,7 @@ def download_civitai_model(model_id: str, output_dir: Path, token: str = "", fil
     log('error', f'All download attempts failed for model {model_id}')
     return False
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Simple CivitAI downloader for Ignition')
     parser.add_argument('--models', default='', help='Comma-separated list of model IDs (checkpoints)')

@@ -7,6 +7,7 @@ Common functions for aria2c downloads, logging, and file operations.
 import subprocess
 import re
 from pathlib import Path
+from typing import Callable, List
 
 # Constants - standardized across all downloaders
 ARIA2_CONNECTIONS = 8  # Balanced performance for container environments
@@ -149,15 +150,15 @@ def validate_huggingface_repo(repo: str) -> bool:
 
     return True
 
-def validate_models_list(models_str: str, validator_func, model_type: str) -> list:
+def validate_models_list(models_str: str, validator_func: Callable[[str], bool], model_type: str) -> List[str]:
     """Validate and parse comma-separated model list."""
     if not models_str or not models_str.strip():
         return []
 
-    valid_models = []
-    invalid_count = 0
+    valid_models: List[str] = []
+    invalid_count: int = 0
 
-    models = [m.strip() for m in models_str.split(',') if m.strip()]
+    models: List[str] = [m.strip() for m in models_str.split(',') if m.strip()]
 
     for model in models:
         if validator_func(model):

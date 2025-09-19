@@ -8,7 +8,7 @@ import os
 import sys
 import argparse
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 # Import shared utilities
 from download_utils import log, download_with_aria2, validate_huggingface_repo, validate_models_list
@@ -69,18 +69,18 @@ def normalize_flux_key(model_input: str) -> str:
     # Default fallback
     return model_input
 
-def parse_generic_repo(model_input: str) -> dict:
+def parse_generic_repo(model_input: str) -> Optional[Dict[str, str]]:
     """Parse generic HuggingFace repo format: repo:filename:subdir[:branch]"""
-    parts = model_input.split(':')
+    parts: List[str] = model_input.split(':')
     if len(parts) < 3:
         return None
         
-    repo = parts[0]
-    filename = parts[1] 
-    subdir = parts[2]
-    branch = parts[3] if len(parts) > 3 else 'main'
+    repo: str = parts[0]
+    filename: str = parts[1] 
+    subdir: str = parts[2]
+    branch: str = parts[3] if len(parts) > 3 else 'main'
     
-    url = f"https://huggingface.co/{repo}/resolve/{branch}/{filename}"
+    url: str = f"https://huggingface.co/{repo}/resolve/{branch}/{filename}"
     
     return {
         'url': url,
@@ -91,7 +91,7 @@ def parse_generic_repo(model_input: str) -> dict:
 def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") -> bool:
     """Download a FLUX model - supports both predefined models and generic HF repos."""
     
-    model_info = None
+    model_info: Optional[Dict[str, str]] = None
     
     # Check if it's a predefined model
     if model_key in FLUX_MODELS:
@@ -123,7 +123,7 @@ def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") 
     log('info', f'Target directory: {subdir}/')
     return download_with_aria2(url, target_dir, filename, token)
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Simple HuggingFace downloader for Ignition using Hearmeman\'s approach')
     parser.add_argument('--repos', required=True, help='Comma-separated list of FLUX model keys. Predefined: flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev. Generic format: repo:filename:subdir[:branch]')
