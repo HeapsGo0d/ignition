@@ -57,19 +57,15 @@ check_model_source_activity() {
     echo "$recent_activity"
 }
 
-# Update download state file
+# Update download state file (simplified)
 update_download_state() {
     local aria2c_count=$1
-    local model_activity=$2
-    local timestamp=$(date +%s)
+    local downloads_active=$([ "$aria2c_count" -gt 0 ] && echo "true" || echo "false")
 
     cat > "$STATE_FILE" <<EOF
 {
-    "timestamp": $timestamp,
     "aria2c_count": $aria2c_count,
-    "model_activity": "$model_activity",
-    "downloads_active": $([ "$aria2c_count" -gt 0 ] && echo "true" || echo "false"),
-    "last_activity": $timestamp
+    "downloads_active": $downloads_active
 }
 EOF
 }
@@ -83,10 +79,9 @@ get_download_state() {
     fi
 }
 
-# Check if downloads should be protected
+# Check if downloads should be protected (simplified approach)
 should_protect_downloads() {
     local aria2c_count=$1
-    local current_time=$(date +%s)
 
     # Always protect if aria2c is running
     if [ "$aria2c_count" -gt 0 ]; then
@@ -94,17 +89,24 @@ should_protect_downloads() {
         return
     fi
 
-    # Check grace period after last aria2c exit
-    if [ -f "$STATE_FILE" ]; then
-        local last_activity
-        last_activity=$(grep -o '"last_activity": [0-9]*' "$STATE_FILE" | cut -d':' -f2 | tr -d ' ')
-        if [ -n "$last_activity" ]; then
-            local time_since_last=$((current_time - last_activity))
-            if [ "$time_since_last" -lt "$DOWNLOAD_GRACE_PERIOD" ]; then
-                echo "true"
-                return
-            fi
+    # Check for recently downloaded files (last 5 minutes)
+    local recent_files=0
+    if [ -d "/workspace/ComfyUI/models" ]; then
+        recent_files=$(find /workspace/ComfyUI/models -type f -mmin -5 2>/dev/null | wc -l)
+    fi
+
+    # Check for active connections to model sources
+    local active_connections=false
+    if command -v netstat >/dev/null 2>&1; then
+        if netstat -tn 2>/dev/null | grep -E "(civitai|huggingface)" >/dev/null 2>&1; then
+            active_connections=true
         fi
+    fi
+
+    # Protect if we have recent file activity or active model connections
+    if [ "$recent_files" -gt 0 ] || [ "$active_connections" = "true" ]; then
+        echo "true"
+        return
     fi
 
     echo "false"
@@ -113,26 +115,24 @@ should_protect_downloads() {
 # Main monitoring loop
 monitor_downloads() {
     log "INFO" "$PROTECT Download protector started"
-    log "INFO" "Grace period: ${DOWNLOAD_GRACE_PERIOD}s after aria2c exits"
+    log "INFO" "Monitoring aria2c processes and recent file activity"
 
     while true; do
         local aria2c_count
-        local model_activity
         local protect_downloads
 
         aria2c_count=$(check_aria2c_processes)
-        model_activity=$(check_model_source_activity)
         protect_downloads=$(should_protect_downloads "$aria2c_count")
 
         # Update state
-        update_download_state "$aria2c_count" "$model_activity"
+        update_download_state "$aria2c_count"
 
         # Log status if downloads are active
         if [ "$aria2c_count" -gt 0 ]; then
             log "INFO" "$DOWNLOAD Downloads active: $aria2c_count aria2c processes"
             log "INFO" "$PROTECT Protecting model download domains"
         elif [ "$protect_downloads" = "true" ]; then
-            log "INFO" "$PROTECT Grace period active - protecting downloads"
+            log "INFO" "$PROTECT Recent download activity detected - protecting downloads"
         fi
 
         # Sleep before next check
