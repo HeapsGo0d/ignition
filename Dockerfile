@@ -21,7 +21,7 @@ WORKDIR /workspace
 
 # Install additional system dependencies including aria2 for downloads and privacy tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ffmpeg git aria2 git-lfs wget vim \
+    curl ffmpeg git aria2 git-lfs wget vim jq \
     libgl1-mesa-glx libglib2.0-0 \
     iptables netstat-nat net-tools iproute2 \
     dnsutils psmisc procps \
@@ -79,6 +79,12 @@ RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh |
 # Copy our scripts
 COPY scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
+
+# Create symlinks for terminal commands in /usr/local/bin
+RUN ln -sf /workspace/scripts/ignition-privacy /usr/local/bin/ignition-privacy && \
+    ln -sf /workspace/scripts/ignition-status /usr/local/bin/ignition-status && \
+    ln -sf /workspace/scripts/ignition-monitor /usr/local/bin/ignition-monitor && \
+    ln -sf /workspace/scripts/ignition-block-all /usr/local/bin/ignition-block-all
 
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""

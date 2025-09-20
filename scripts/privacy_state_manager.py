@@ -34,6 +34,7 @@ class PrivacyStateManager:
             "block_telemetry": True,
             "block_ai_services": True,
             "allow_model_downloads": True,
+            "monitoring_only": self.detect_monitoring_only_mode(),
         }
 
         # Domain lists
@@ -74,6 +75,40 @@ class PrivacyStateManager:
 
         # Initialize logging
         self.log_file = Path("/tmp/ignition_privacy_manager.log")
+
+    def detect_monitoring_only_mode(self) -> bool:
+        """Detect if we should run in monitoring-only mode (no iptables blocking)"""
+        try:
+            # Test if we have iptables permissions by trying a simple list command
+            result = subprocess.run(
+                ["iptables", "-L", "-n"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                return True  # Can't use iptables, use monitoring-only mode
+
+            # Check if we're in a constrained container environment
+            # RunPod containers often have this limitation
+            try:
+                # Try to create a test rule and immediately remove it
+                test_result = subprocess.run(
+                    ["iptables", "-A", "OUTPUT", "-j", "ACCEPT"],
+                    capture_output=True, text=True, timeout=2
+                )
+                if test_result.returncode == 0:
+                    # Clean up test rule
+                    subprocess.run(
+                        ["iptables", "-D", "OUTPUT", "-j", "ACCEPT"],
+                        capture_output=True, timeout=2
+                    )
+                    return False  # iptables works
+                else:
+                    return True  # iptables blocked
+            except Exception:
+                return True  # Error = assume monitoring-only
+
+        except Exception:
+            return True  # Default to monitoring-only on any error
 
     def log(self, level: str, message: str):
         """Log message with timestamp"""
@@ -198,6 +233,10 @@ class PrivacyStateManager:
             self.log("INFO", "Privacy disabled - no iptables rules applied")
             return
 
+        if self.config["monitoring_only"]:
+            self.log("INFO", f"Monitoring-only mode - {self.current_state.value} state tracked but no iptables blocking")
+            return
+
         try:
             # Clear existing rules
             subprocess.run(["iptables", "-F", "OUTPUT"], check=False)
@@ -251,8 +290,14 @@ class PrivacyStateManager:
 
         except subprocess.CalledProcessError as e:
             self.log("WARNING", f"Failed to apply iptables rules: {e}")
+            # If iptables fails, switch to monitoring-only mode
+            self.config["monitoring_only"] = True
+            self.log("WARNING", "Switching to monitoring-only mode due to iptables errors")
         except Exception as e:
             self.log("ERROR", f"Error applying iptables rules: {e}")
+            # If iptables fails, switch to monitoring-only mode
+            self.config["monitoring_only"] = True
+            self.log("WARNING", "Switching to monitoring-only mode due to iptables errors")
 
     def update_state(self):
         """Update current privacy state based on conditions"""
@@ -320,9 +365,20 @@ class PrivacyStateManager:
         download_status = self.get_download_status()
         current_time = time.time()
 
+        # Add mode description
+        mode_description = "Unknown"
+        if not self.config["privacy_enabled"]:
+            mode_description = "Privacy disabled"
+        elif self.config["monitoring_only"]:
+            mode_description = f"Monitoring-only ({self.current_state.value})"
+        else:
+            mode_description = f"Active blocking ({self.current_state.value})"
+
         return {
             "state": self.current_state.value,
+            "mode": mode_description,
             "privacy_enabled": self.config["privacy_enabled"],
+            "monitoring_only": self.config["monitoring_only"],
             "startup_time": self.startup_time,
             "uptime": current_time - self.startup_time,
             "comfyui_ready": self.check_comfyui_ready(),
@@ -347,6 +403,14 @@ class PrivacyStateManager:
     def run_monitoring_loop(self):
         """Main monitoring loop"""
         self.log("INFO", "Privacy state manager started")
+
+        if self.config["monitoring_only"]:
+            self.log("INFO", "🔍 Running in MONITORING-ONLY mode (iptables unavailable)")
+            self.log("INFO", "Connections will be tracked but not blocked")
+        else:
+            self.log("INFO", "🛡️ Running in ACTIVE BLOCKING mode")
+            self.log("INFO", "Connections will be tracked and blocked based on privacy rules")
+
         self.log("INFO", f"Configuration: {self.config}")
 
         # Load previous state if available

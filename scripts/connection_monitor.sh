@@ -117,24 +117,51 @@ monitor_netstat() {
         # Get current established connections
         if command -v netstat >/dev/null 2>&1; then
             netstat -tn 2>/dev/null | grep ESTABLISHED | while read -r line; do
+                # Skip empty lines
+                [[ -z "$line" ]] && continue
+
                 # Parse netstat output
-                local proto=$(echo "$line" | awk '{print $1}')
                 local local_addr=$(echo "$line" | awk '{print $4}')
                 local remote_addr=$(echo "$line" | awk '{print $5}')
 
-                # Extract remote IP and port
-                local remote_ip=$(echo "$remote_addr" | cut -d':' -f1)
-                local remote_port=$(echo "$remote_addr" | cut -d':' -f2)
+                # Extract remote IP and port (handle both IPv4 and IPv6)
+                local remote_ip=""
+                local remote_port=""
 
-                # Skip local connections
-                if [[ "$remote_ip" =~ ^127\.|^::1|^localhost ]]; then
+                if [[ "$remote_addr" =~ ^\[.*\]: ]]; then
+                    # IPv6 format [::1]:8080
+                    remote_ip=$(echo "$remote_addr" | sed 's/^\[\(.*\)\]:.*/\1/')
+                    remote_port=$(echo "$remote_addr" | sed 's/.*\]:\(.*\)/\1/')
+                elif [[ "$remote_addr" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+: ]]; then
+                    # IPv4 format 192.168.1.1:80
+                    remote_ip=$(echo "$remote_addr" | cut -d':' -f1)
+                    remote_port=$(echo "$remote_addr" | cut -d':' -f2)
+                else
                     continue
                 fi
 
-                # Try to resolve hostname
-                local hostname="unknown"
-                if command -v nslookup >/dev/null 2>&1; then
-                    hostname=$(timeout 2 nslookup "$remote_ip" 2>/dev/null | grep "name =" | cut -d'=' -f2 | tr -d ' ' || echo "unknown")
+                # Skip local connections
+                if [[ "$remote_ip" =~ ^127\.|^::1|^localhost|^0\.0\.0\.0 ]]; then
+                    continue
+                fi
+
+                # Try to resolve hostname with multiple approaches
+                local hostname="$remote_ip"
+
+                # Try getent first (fastest and most reliable)
+                if command -v getent >/dev/null 2>&1; then
+                    local resolved=$(timeout 1 getent hosts "$remote_ip" 2>/dev/null | awk '{print $2}' | head -1)
+                    if [[ -n "$resolved" && "$resolved" != "$remote_ip" ]]; then
+                        hostname="$resolved"
+                    fi
+                fi
+
+                # Fallback to nslookup if getent didn't work
+                if [[ "$hostname" == "$remote_ip" ]] && command -v nslookup >/dev/null 2>&1; then
+                    local resolved=$(timeout 1 nslookup "$remote_ip" 2>/dev/null | grep "name =" | cut -d'=' -f2 | tr -d ' ' | head -1)
+                    if [[ -n "$resolved" && "$resolved" != "$remote_ip" ]]; then
+                        hostname="$resolved"
+                    fi
                 fi
 
                 # Track the connection
@@ -154,23 +181,57 @@ monitor_ss() {
         # Get current established connections
         if command -v ss >/dev/null 2>&1; then
             ss -tn state established 2>/dev/null | tail -n +2 | while read -r line; do
-                # Parse ss output
-                local local_addr=$(echo "$line" | awk '{print $4}')
-                local remote_addr=$(echo "$line" | awk '{print $5}')
+                # Skip empty lines
+                [[ -z "$line" ]] && continue
 
-                # Extract remote IP and port
-                local remote_ip=$(echo "$remote_addr" | cut -d':' -f1)
-                local remote_port=$(echo "$remote_addr" | cut -d':' -f2)
+                # Parse ss output - handle IPv4 and IPv6
+                local remote_addr=""
+                if echo "$line" | grep -q "::ffff:"; then
+                    # IPv4-mapped IPv6 address
+                    remote_addr=$(echo "$line" | awk '{print $5}' | sed 's/::ffff://')
+                else
+                    # Regular IPv4 or IPv6
+                    remote_addr=$(echo "$line" | awk '{print $5}')
+                fi
 
-                # Skip local connections
-                if [[ "$remote_ip" =~ ^127\.|^::1|^localhost ]]; then
+                # Extract remote IP and port (handle both IPv4 and IPv6)
+                local remote_ip=""
+                local remote_port=""
+
+                if [[ "$remote_addr" =~ ^\[.*\]: ]]; then
+                    # IPv6 format [::1]:8080
+                    remote_ip=$(echo "$remote_addr" | sed 's/^\[\(.*\)\]:.*/\1/')
+                    remote_port=$(echo "$remote_addr" | sed 's/.*\]:\(.*\)/\1/')
+                elif [[ "$remote_addr" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+: ]]; then
+                    # IPv4 format 192.168.1.1:80
+                    remote_ip=$(echo "$remote_addr" | cut -d':' -f1)
+                    remote_port=$(echo "$remote_addr" | cut -d':' -f2)
+                else
                     continue
                 fi
 
-                # Try to resolve hostname
-                local hostname="unknown"
-                if command -v dig >/dev/null 2>&1; then
-                    hostname=$(timeout 2 dig +short -x "$remote_ip" 2>/dev/null | sed 's/\.$//' || echo "unknown")
+                # Skip local connections
+                if [[ "$remote_ip" =~ ^127\.|^::1|^localhost|^0\.0\.0\.0 ]]; then
+                    continue
+                fi
+
+                # Try to resolve hostname with multiple approaches
+                local hostname="$remote_ip"
+
+                # Try getent first (fastest and most reliable)
+                if command -v getent >/dev/null 2>&1; then
+                    local resolved=$(timeout 1 getent hosts "$remote_ip" 2>/dev/null | awk '{print $2}' | head -1)
+                    if [[ -n "$resolved" && "$resolved" != "$remote_ip" ]]; then
+                        hostname="$resolved"
+                    fi
+                fi
+
+                # Fallback to dig if getent didn't work
+                if [[ "$hostname" == "$remote_ip" ]] && command -v dig >/dev/null 2>&1; then
+                    local resolved=$(timeout 1 dig +short -x "$remote_ip" 2>/dev/null | sed 's/\.$//' | head -1)
+                    if [[ -n "$resolved" && "$resolved" != "$remote_ip" ]]; then
+                        hostname="$resolved"
+                    fi
                 fi
 
                 # Track the connection

@@ -16,6 +16,9 @@ export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME}"
 mkdir -p "$HF_HOME" || true
 
+# Add scripts to PATH for terminal access
+export PATH="/workspace/scripts:$PATH"
+
 # Consistent Python interpreter
 PYBIN="$(command -v python3 || command -v python)"
 
