@@ -157,6 +157,110 @@ test_domains() {
     fi
 }
 
+# Show current activities
+show_activities() {
+    echo "=== Active Detected Activities ==="
+    echo ""
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 "$SCRIPT_DIR/privacy_state_manager.py" status 2>/dev/null | jq -r '
+            if .activities.detection_available then
+                if .activities.active_count > 0 then
+                    "🔍 Active Activities: " + (.activities.active_count | tostring),
+                    "🎯 High Confidence: " + (.activities.high_confidence_count | tostring),
+                    "🏥 System Health: " + (.activities.health_score | tostring),
+                    "",
+                    "📋 Activity Details:"
+                else
+                    "✅ No active activities detected"
+                end
+            else
+                "❌ Activity detection not available"
+            end
+        ' 2>/dev/null || echo "Status unavailable"
+
+        # Show individual activities
+        python3 "$SCRIPT_DIR/privacy_state_manager.py" status 2>/dev/null | jq -r '
+            if .activities.detection_available and .activities.active_count > 0 then
+                .activities.active_activities[] |
+                "  • " + .activity_type + " (PID: " + (.process_info.pid | tostring) +
+                ", Confidence: " + (.confidence | tostring) +
+                ", Policy: " + .policy_action + ")" +
+                if (.allowed_domains | length) > 0 then
+                    "\n    Domains: " + (.allowed_domains | join(", "))
+                else
+                    ""
+                end
+            else
+                empty
+            end
+        ' 2>/dev/null
+    else
+        echo "$ERROR Python3 not available"
+    fi
+}
+
+# Debug commands
+debug_command() {
+    local debug_type="$1"
+
+    case "$debug_type" in
+        "activities")
+            echo "=== Activity Detection Debug ==="
+            echo ""
+            show_activities
+            ;;
+        "health")
+            echo "=== System Health Debug ==="
+            echo ""
+            if command -v python3 >/dev/null 2>&1; then
+                python3 "$SCRIPT_DIR/privacy_state_manager.py" status 2>/dev/null | jq -r '
+                    if .activities.detection_available then
+                        "🏥 Health Score: " + (.activities.health_score | tostring),
+                        "🔄 Fallback Recommended: " + (.activities.fallback_recommended // false | tostring),
+                        "📊 Detection Available: " + (.activities.detection_available | tostring)
+                    else
+                        "❌ Activity detection not available"
+                    end
+                ' 2>/dev/null || echo "Status unavailable"
+            fi
+            ;;
+        "timeline")
+            echo "=== Activity Timeline Debug ==="
+            echo ""
+            echo "📋 Recent Connection Log with Activity Context:"
+            if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
+                "$SCRIPT_DIR/connection_monitor.sh" recent 10 2>/dev/null || echo "Connection monitor not available"
+            fi
+            ;;
+        "processes")
+            echo "=== Process Monitoring Debug ==="
+            echo ""
+            echo "📊 Interesting Processes:"
+            ps aux | grep -E "(pip|git|python|aria2c|wget|curl)" | grep -v grep | head -10
+            ;;
+        "rules")
+            echo "=== Active Rules Debug ==="
+            echo ""
+            if command -v python3 >/dev/null 2>&1; then
+                python3 "$SCRIPT_DIR/privacy_state_manager.py" status 2>/dev/null | jq -r '
+                    "🔒 Current State: " + .state,
+                    "🌐 Allowed Domains: " + (.allowed_domains | length | tostring) + " domains",
+                    "  " + (.allowed_domains | join(", "))
+                ' 2>/dev/null || echo "Status unavailable"
+            fi
+            ;;
+        *)
+            echo "Available debug commands:"
+            echo "  activities  - Show active detected activities"
+            echo "  health      - Show activity detection health status"
+            echo "  timeline    - Show recent connections with activity context"
+            echo "  processes   - Show interesting running processes"
+            echo "  rules       - Show active privacy rules and allowed domains"
+            ;;
+    esac
+}
+
 # Show help
 show_help() {
     echo "Ignition Privacy Control Commands"
@@ -168,10 +272,19 @@ show_help() {
     echo "  monitor             Show real-time connection monitoring"
     echo "  summary             Show connection summary and statistics"
     echo "  downloads           Show active download status"
+    echo "  activities          Show detected activities (NEW)"
+    echo "  debug <type>        Debug specific component (NEW)"
     echo "  block-all           Emergency block all connections"
     echo "  allow <domain> [s]  Temporarily allow domain (default: 300s)"
     echo "  test                Test domain classification"
     echo "  help                Show this help message"
+    echo ""
+    echo "Debug Types:"
+    echo "  activities          Show active detected activities"
+    echo "  health              Show activity detection health"
+    echo "  timeline            Show connection timeline with activities"
+    echo "  processes           Show interesting processes"
+    echo "  rules               Show active privacy rules"
     echo ""
     echo "Aliases:"
     echo "  ignition-status     = ignition-privacy status"
@@ -180,6 +293,9 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  ignition-privacy status"
+    echo "  ignition-privacy activities"
+    echo "  ignition-privacy debug health"
+    echo "  ignition-privacy debug timeline"
     echo "  ignition-privacy monitor"
     echo "  ignition-privacy allow github.com 600"
     echo "  ignition-privacy block-all"
@@ -215,7 +331,13 @@ main() {
         "test"|"test-domains")
             test_domains
             ;;
-        "help"|"--help"|"-h")
+        "debug")
+            debug_command "${2:-activities}"
+            ;;
+    "activities")
+            show_activities
+            ;;
+    "help"|"--help"|"-h")
             show_help
             ;;
         *)

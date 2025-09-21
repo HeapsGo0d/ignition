@@ -1,0 +1,191 @@
+{
+  "activity_patterns": {
+    "pip_install": {
+      "commands": ["pip", "pip3", "python", "python3"],
+      "args": ["install", "pip install", "-m pip install"],
+      "allowed_domains": [
+        "pypi.org",
+        "pypi.python.org",
+        "files.pythonhosted.org",
+        "pythonhosted.org"
+      ],
+      "base_confidence": 0.9,
+      "duration_estimate": 180,
+      "confidence_modifiers": {
+        "install_specific_package": 0.1,
+        "from_comfyui_directory": 0.05,
+        "has_version_flag": -0.1,
+        "uses_sudo": -0.05
+      },
+      "risk_factors": []
+    },
+    "pip_upgrade": {
+      "commands": ["pip", "pip3", "python", "python3"],
+      "args": ["upgrade", "pip upgrade", "-m pip upgrade", "--upgrade"],
+      "allowed_domains": [
+        "pypi.org",
+        "pypi.python.org",
+        "files.pythonhosted.org",
+        "pythonhosted.org"
+      ],
+      "base_confidence": 0.85,
+      "duration_estimate": 120,
+      "confidence_modifiers": {
+        "from_comfyui_directory": 0.1,
+        "uses_sudo": -0.05
+      },
+      "risk_factors": []
+    },
+    "git_clone": {
+      "commands": ["git"],
+      "args": ["clone"],
+      "allowed_domains": [
+        "github.com",
+        "gitlab.com",
+        "bitbucket.org",
+        "git.sr.ht",
+        "codeberg.org"
+      ],
+      "base_confidence": 0.8,
+      "duration_estimate": 120,
+      "confidence_modifiers": {
+        "from_comfyui_directory": 0.15,
+        "suspicious_url": -0.3
+      },
+      "risk_factors": ["arbitrary_code_execution"]
+    },
+    "git_pull": {
+      "commands": ["git"],
+      "args": ["pull", "fetch", "checkout"],
+      "allowed_domains": [
+        "github.com",
+        "gitlab.com",
+        "bitbucket.org",
+        "git.sr.ht",
+        "codeberg.org"
+      ],
+      "base_confidence": 0.85,
+      "duration_estimate": 60,
+      "confidence_modifiers": {
+        "from_comfyui_directory": 0.1
+      },
+      "risk_factors": ["code_changes"]
+    },
+    "extension_update": {
+      "commands": ["python", "python3"],
+      "cwd": ["/ComfyUI/custom_nodes", "/workspace/ComfyUI/custom_nodes"],
+      "allowed_domains": [
+        "github.com",
+        "pypi.org",
+        "files.pythonhosted.org"
+      ],
+      "base_confidence": 0.85,
+      "duration_estimate": 240,
+      "confidence_modifiers": {
+        "install_specific_package": 0.1
+      },
+      "risk_factors": ["extension_code"]
+    },
+    "package_install": {
+      "commands": ["apt", "apt-get", "yum", "dnf", "apk"],
+      "args": ["install", "upgrade", "update"],
+      "allowed_domains": [
+        "archive.ubuntu.com",
+        "security.ubuntu.com",
+        "deb.debian.org",
+        "security.debian.org",
+        "dl.fedoraproject.org",
+        "mirrors.fedoraproject.org"
+      ],
+      "base_confidence": 0.7,
+      "duration_estimate": 300,
+      "confidence_modifiers": {
+        "uses_sudo": 0.1
+      },
+      "risk_factors": ["system_changes", "elevated_privileges"]
+    },
+    "web_download": {
+      "commands": ["wget", "curl", "aria2c"],
+      "args": ["http", "https", "ftp"],
+      "allowed_domains": [],
+      "base_confidence": 0.4,
+      "duration_estimate": 180,
+      "confidence_modifiers": {
+        "from_comfyui_directory": 0.2,
+        "suspicious_url": -0.4
+      },
+      "risk_factors": ["arbitrary_downloads"]
+    },
+    "unknown": {
+      "commands": [".*"],
+      "args": [],
+      "allowed_domains": [],
+      "base_confidence": 0.1,
+      "duration_estimate": 300,
+      "confidence_modifiers": {},
+      "risk_factors": ["unknown_activity"]
+    }
+  },
+  "confidence_thresholds": {
+    "high_confidence": 0.9,
+    "medium_confidence": 0.7,
+    "low_confidence": 0.5,
+    "suspicious_threshold": 0.3
+  },
+  "policy_actions": {
+    "allow_unrestricted": {
+      "description": "Allow all connections for this activity",
+      "monitoring_level": "basic"
+    },
+    "allow_with_monitoring": {
+      "description": "Allow connections but log extensively",
+      "monitoring_level": "enhanced"
+    },
+    "strict_allowlist": {
+      "description": "Only allow pre-approved domains",
+      "monitoring_level": "strict"
+    },
+    "emergency_review": {
+      "description": "Flag for manual review, temporary allow",
+      "monitoring_level": "maximum"
+    },
+    "block_all": {
+      "description": "Block all connections from this activity",
+      "monitoring_level": "maximum"
+    }
+  },
+  "health_monitoring": {
+    "short_window": 300,
+    "medium_window": 900,
+    "long_window": 3600,
+    "fallback_threshold": 0.3,
+    "adaptive_threshold_enabled": true
+  },
+  "domain_classifications": {
+    "always_allowed": [
+      "civitai.com",
+      "huggingface.co"
+    ],
+    "startup_only": [
+      "github.com"
+    ],
+    "always_blocked": [
+      "analytics.google.com",
+      "google-analytics.com",
+      "googletagmanager.com",
+      "doubleclick.net",
+      "api.openai.com",
+      "api.blackforestlabs.ai",
+      "anthropic.com",
+      "cohere.ai",
+      "replicate.com"
+    ],
+    "suspicious_tlds": [
+      ".tk",
+      ".ml",
+      ".ga",
+      ".cf",
+      ".cc"
+    ]
+  }
+}

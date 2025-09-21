@@ -2,6 +2,8 @@
 """
 Privacy State Manager - Core logic for managing privacy blocking states
 Part of Ignition Privacy Blocking System
+
+Enhanced with Activity-Based Process Awareness for intelligent blocking decisions.
 """
 
 import os
@@ -14,9 +16,18 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 from enum import Enum
 
+# Import activity detection components (with fallback if not available)
+try:
+    from activity_detector import ActivityDetector, DetectedActivity, PolicyAction
+    ACTIVITY_DETECTION_AVAILABLE = True
+except ImportError:
+    ACTIVITY_DETECTION_AVAILABLE = False
+    print("Activity detection not available, falling back to basic mode")
+
 class PrivacyState(Enum):
     STARTUP = "startup"
     DOWNLOADS_ACTIVE = "downloads_active"
+    ACTIVITY_DETECTED = "activity_detected"  # NEW: Activity-based state
     STRICT = "strict"
     EMERGENCY_BLOCK = "emergency_block"
 
@@ -35,6 +46,8 @@ class PrivacyStateManager:
             "block_ai_services": True,
             "allow_model_downloads": True,
             "monitoring_only": self.detect_monitoring_only_mode(),
+            "activity_aware_enabled": ACTIVITY_DETECTION_AVAILABLE,  # NEW
+            "activity_confidence_threshold": 0.7,  # NEW
         }
 
         # Domain lists
@@ -65,6 +78,9 @@ class PrivacyStateManager:
             "github.com"
         }
 
+        # Initialize logging first
+        self.log_file = Path("/tmp/ignition_privacy_manager.log")
+
         # Current state
         self.current_state = PrivacyState.STARTUP
         self.startup_time = time.time()
@@ -73,8 +89,55 @@ class PrivacyStateManager:
         # Load configuration
         self.load_config()
 
-        # Initialize logging
-        self.log_file = Path("/tmp/ignition_privacy_manager.log")
+        # Activity detection components (after config is loaded)
+        self.activity_detector: Optional[ActivityDetector] = None
+        if ACTIVITY_DETECTION_AVAILABLE and self.config["activity_aware_enabled"]:
+            try:
+                self.activity_detector = ActivityDetector()
+                self.log("INFO", "🔍 Activity detection enabled")
+            except Exception as e:
+                self.log("WARNING", f"Failed to initialize activity detector: {e}")
+                self.activity_detector = None
+
+    def get_activity_status(self) -> Dict:
+        """Get current activity detection status"""
+        if not self.activity_detector:
+            return {
+                "has_active_activities": False,
+                "has_high_confidence_activity": False,
+                "system_healthy": True,
+                "active_activities": [],
+                "health_score": 1.0
+            }
+
+        try:
+            active_activities = self.activity_detector.get_active_activities()
+            health_status = self.activity_detector.get_health_status()
+
+            # Check for high-confidence activities
+            high_confidence_activities = [
+                activity for activity in active_activities
+                if activity.confidence >= self.config["activity_confidence_threshold"]
+            ]
+
+            return {
+                "has_active_activities": len(active_activities) > 0,
+                "has_high_confidence_activity": len(high_confidence_activities) > 0,
+                "system_healthy": health_status["health_score"] > 0.5 and not health_status["should_fallback"],
+                "active_activities": [activity.to_dict() for activity in active_activities],
+                "health_score": health_status["health_score"],
+                "fallback_recommended": health_status["should_fallback"]
+            }
+
+        except Exception as e:
+            self.log("WARNING", f"Error getting activity status: {e}")
+            return {
+                "has_active_activities": False,
+                "has_high_confidence_activity": False,
+                "system_healthy": False,  # Error = unhealthy
+                "active_activities": [],
+                "health_score": 0.0
+            }
 
     def detect_monitoring_only_mode(self) -> bool:
         """Detect if we should run in monitoring-only mode (no iptables blocking)"""
@@ -210,7 +273,7 @@ class PrivacyStateManager:
         return True
 
     def get_current_allowlist(self) -> Set[str]:
-        """Get current allowed domains based on state"""
+        """Get current allowed domains based on state and detected activities"""
         allowed = set(self.allowed_domains)  # Always allow model sources
 
         if self.current_state == PrivacyState.STARTUP:
@@ -218,9 +281,20 @@ class PrivacyStateManager:
         elif self.current_state == PrivacyState.DOWNLOADS_ACTIVE:
             # Only model sources allowed
             pass
+        elif self.current_state == PrivacyState.ACTIVITY_DETECTED:
+            # NEW: Allow domains based on detected activities
+            activity_status = self.get_activity_status()
+            for activity_data in activity_status["active_activities"]:
+                if activity_data["confidence"] >= self.config["activity_confidence_threshold"]:
+                    allowed.update(activity_data["allowed_domains"])
+                    self.log("INFO", f"🔍 Activity {activity_data['activity_type']} allows: {activity_data['allowed_domains']}")
         elif self.current_state == PrivacyState.STRICT:
-            # Only model sources allowed
-            pass
+            # Only model sources allowed, but check for high-confidence activities
+            activity_status = self.get_activity_status()
+            for activity_data in activity_status["active_activities"]:
+                # Only very high confidence activities get domains in strict mode
+                if activity_data["confidence"] >= 0.9:
+                    allowed.update(activity_data["allowed_domains"])
         elif self.current_state == PrivacyState.EMERGENCY_BLOCK:
             # Nothing allowed except localhost
             return set()
@@ -300,24 +374,48 @@ class PrivacyStateManager:
             self.log("WARNING", "Switching to monitoring-only mode due to iptables errors")
 
     def update_state(self):
-        """Update current privacy state based on conditions"""
+        """Update current privacy state based on conditions and detected activities"""
         old_state = self.current_state
         download_status = self.get_download_status()
 
-        # State transition logic
+        # Get activity status if available
+        activity_status = self.get_activity_status()
+
+        # Enhanced state transition logic with activity awareness
         if self.current_state == PrivacyState.STARTUP:
             if download_status["active"]:
                 self.current_state = PrivacyState.DOWNLOADS_ACTIVE
+            elif activity_status["has_high_confidence_activity"]:
+                self.current_state = PrivacyState.ACTIVITY_DETECTED
             elif self.should_transition_to_strict():
                 self.current_state = PrivacyState.STRICT
 
         elif self.current_state == PrivacyState.DOWNLOADS_ACTIVE:
             if not download_status["downloads_protected"]:
-                self.current_state = PrivacyState.STRICT
+                # Check for activities before going to strict mode
+                if activity_status["has_high_confidence_activity"]:
+                    self.current_state = PrivacyState.ACTIVITY_DETECTED
+                else:
+                    self.current_state = PrivacyState.STRICT
+
+        elif self.current_state == PrivacyState.ACTIVITY_DETECTED:
+            # Activity-detected state transitions
+            if download_status["active"]:
+                # Downloads take priority
+                self.current_state = PrivacyState.DOWNLOADS_ACTIVE
+            elif not activity_status["has_active_activities"]:
+                # No more activities, check health before going strict
+                if activity_status["system_healthy"]:
+                    self.current_state = PrivacyState.STRICT
+                else:
+                    # System unhealthy, stay in activity mode for safety
+                    pass  # Stay in ACTIVITY_DETECTED
 
         elif self.current_state == PrivacyState.STRICT:
             if download_status["active"]:
                 self.current_state = PrivacyState.DOWNLOADS_ACTIVE
+            elif activity_status["has_high_confidence_activity"]:
+                self.current_state = PrivacyState.ACTIVITY_DETECTED
 
         # Log state changes
         if old_state != self.current_state:
@@ -361,24 +459,31 @@ class PrivacyStateManager:
                 self.log("WARNING", f"Failed to load state: {e}")
 
     def get_status(self) -> Dict:
-        """Get current privacy system status"""
+        """Get current privacy system status with activity detection"""
         download_status = self.get_download_status()
+        activity_status = self.get_activity_status()
         current_time = time.time()
 
-        # Add mode description
+        # Add mode description with activity awareness
         mode_description = "Unknown"
         if not self.config["privacy_enabled"]:
             mode_description = "Privacy disabled"
         elif self.config["monitoring_only"]:
             mode_description = f"Monitoring-only ({self.current_state.value})"
+            if self.config["activity_aware_enabled"]:
+                mode_description += " + Activity Detection"
         else:
             mode_description = f"Active blocking ({self.current_state.value})"
+            if self.config["activity_aware_enabled"]:
+                mode_description += " + Activity Aware"
 
-        return {
+        # Build enhanced status
+        status = {
             "state": self.current_state.value,
             "mode": mode_description,
             "privacy_enabled": self.config["privacy_enabled"],
             "monitoring_only": self.config["monitoring_only"],
+            "activity_aware_enabled": self.config["activity_aware_enabled"],
             "startup_time": self.startup_time,
             "uptime": current_time - self.startup_time,
             "comfyui_ready": self.check_comfyui_ready(),
@@ -386,6 +491,22 @@ class PrivacyStateManager:
             "allowed_domains": list(self.get_current_allowlist()),
             "config": self.config
         }
+
+        # Add activity detection status if available
+        if self.config["activity_aware_enabled"]:
+            status["activities"] = {
+                "detection_available": self.activity_detector is not None,
+                "active_count": len(activity_status["active_activities"]),
+                "high_confidence_count": len([
+                    a for a in activity_status["active_activities"]
+                    if a["confidence"] >= self.config["activity_confidence_threshold"]
+                ]),
+                "health_score": activity_status["health_score"],
+                "system_healthy": activity_status["system_healthy"],
+                "active_activities": activity_status["active_activities"]
+            }
+
+        return status
 
     def set_emergency_block(self):
         """Activate emergency blocking mode"""
@@ -401,7 +522,7 @@ class PrivacyStateManager:
         # For now, just log the action
 
     def run_monitoring_loop(self):
-        """Main monitoring loop"""
+        """Main monitoring loop with activity detection"""
         self.log("INFO", "Privacy state manager started")
 
         if self.config["monitoring_only"]:
@@ -410,6 +531,15 @@ class PrivacyStateManager:
         else:
             self.log("INFO", "🛡️ Running in ACTIVE BLOCKING mode")
             self.log("INFO", "Connections will be tracked and blocked based on privacy rules")
+
+        # Start activity detection if available
+        if self.activity_detector:
+            try:
+                self.activity_detector.start_monitoring(poll_interval=1.0)
+                self.log("INFO", "🔍 Activity detection started")
+            except Exception as e:
+                self.log("WARNING", f"Failed to start activity detection: {e}")
+                self.activity_detector = None
 
         self.log("INFO", f"Configuration: {self.config}")
 
@@ -426,6 +556,13 @@ class PrivacyStateManager:
 
         except KeyboardInterrupt:
             self.log("INFO", "Privacy state manager stopped")
+            # Stop activity detection
+            if self.activity_detector:
+                try:
+                    self.activity_detector.stop_monitoring()
+                    self.log("INFO", "Activity detection stopped")
+                except Exception as e:
+                    self.log("WARNING", f"Error stopping activity detection: {e}")
         except Exception as e:
             self.log("ERROR", f"Unexpected error: {e}")
 

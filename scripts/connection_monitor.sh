@@ -25,22 +25,62 @@ log() {
     echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
 }
 
-# Track a new outbound connection
+# Get current activity context from privacy state manager
+get_activity_context() {
+    local domain="$1"
+
+    # Try to get activity context from privacy state manager
+    if command -v python3 >/dev/null 2>&1 && [ -f "/workspace/scripts/privacy_state_manager.py" ]; then
+        local context=$(python3 -c "
+import sys
+sys.path.append('/workspace/scripts')
+try:
+    from privacy_state_manager import PrivacyStateManager
+    manager = PrivacyStateManager()
+    status = manager.get_status()
+
+    if 'activities' in status and status['activities']['detection_available']:
+        for activity in status['activities']['active_activities']:
+            if '$domain' in activity.get('allowed_domains', []):
+                print(f\"{activity['activity_type']}:{activity['confidence']:.2f}\")
+                sys.exit(0)
+    print('none')
+except:
+    print('error')
+" 2>/dev/null)
+        echo "$context"
+    else
+        echo "unavailable"
+    fi
+}
+
+# Track a new outbound connection with activity context
 track_connection() {
     local dest_ip="$1"
     local dest_port="$2"
     local dest_host="$3"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # Log the connection
-    echo "$timestamp|$dest_ip|$dest_port|$dest_host" >> "$LOG_FILE"
+    # Get activity context for this connection
+    local activity_context=$(get_activity_context "$dest_host")
+
+    # Enhanced log format with activity context
+    echo "$timestamp|$dest_ip|$dest_port|$dest_host|$activity_context" >> "$LOG_FILE"
 
     # Check if it's a blocked domain
     if is_blocked_domain "$dest_host"; then
-        log "WARNING" "$BLOCK Blocked connection attempt to $dest_host"
+        if [ "$activity_context" != "none" ] && [ "$activity_context" != "error" ] && [ "$activity_context" != "unavailable" ]; then
+            log "WARNING" "$BLOCK Connection to $dest_host blocked despite activity: $activity_context"
+        else
+            log "WARNING" "$BLOCK Blocked connection attempt to $dest_host"
+        fi
         return 1
     else
-        log "INFO" "$NETWORK Connection to $dest_host ($dest_ip:$dest_port)"
+        if [ "$activity_context" != "none" ] && [ "$activity_context" != "error" ] && [ "$activity_context" != "unavailable" ]; then
+            log "INFO" "$NETWORK Connection to $dest_host ($dest_ip:$dest_port) - Activity: $activity_context"
+        else
+            log "INFO" "$NETWORK Connection to $dest_host ($dest_ip:$dest_port)"
+        fi
         return 0
     fi
 }
@@ -270,15 +310,19 @@ stop_monitoring() {
     fi
 }
 
-# Show recent connections
+# Show recent connections with activity context
 show_recent_connections() {
     local count=${1:-20}
 
     echo "=== Recent Network Connections ==="
     if [ -f "$LOG_FILE" ]; then
-        tail -n "$count" "$LOG_FILE" | while IFS='|' read -r timestamp ip port host; do
+        tail -n "$count" "$LOG_FILE" | while IFS='|' read -r timestamp ip port host activity; do
             if [ -n "$timestamp" ]; then
-                echo "$timestamp -> $host ($ip:$port)"
+                if [ -n "$activity" ] && [ "$activity" != "none" ] && [ "$activity" != "error" ] && [ "$activity" != "unavailable" ]; then
+                    echo "$timestamp -> $host ($ip:$port) [Activity: $activity]"
+                else
+                    echo "$timestamp -> $host ($ip:$port)"
+                fi
             fi
         done
     else
