@@ -4,8 +4,14 @@
 
 set -euo pipefail
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Configuration - handle both direct calls and symlinks
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    # Called via symlink, resolve to actual script location
+    SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+else
+    # Called directly
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 
 # Status indicators
 SUCCESS='✅'
