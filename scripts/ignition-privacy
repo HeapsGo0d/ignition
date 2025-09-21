@@ -52,7 +52,7 @@ show_status() {
     # Get download protection status
     echo "$DOWNLOAD Download Protection:"
     if [[ -x "$SCRIPT_DIR/download_protector.sh" ]]; then
-        "$SCRIPT_DIR/download_protector.sh" status
+        "$SCRIPT_DIR/download_protector.sh" status | sed 's/^/  /'
     else
         echo "  Download protector not available"
     fi
@@ -61,9 +61,9 @@ show_status() {
     # Get connection monitoring status
     echo "$MONITOR Connection Monitoring:"
     if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
-        "$SCRIPT_DIR/connection_monitor.sh" status
+        "$SCRIPT_DIR/connection_monitor.sh" status | sed 's/^/  /'
         echo "  Recent connections:"
-        "$SCRIPT_DIR/connection_monitor.sh" recent 5 | sed 's/^/    /'
+        "$SCRIPT_DIR/connection_monitor.sh" recent 5 2>/dev/null | sed 's/^/    /' || echo "    No recent connections logged"
     else
         echo "  Connection monitor not available"
     fi
@@ -76,7 +76,10 @@ monitor_connections() {
     echo ""
 
     if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
-        "$SCRIPT_DIR/connection_monitor.sh" realtime
+        "$SCRIPT_DIR/connection_monitor.sh" realtime 2>/dev/null || {
+            echo "$ERROR Connection monitor failed to start realtime monitoring"
+            exit 1
+        }
     else
         echo "$ERROR Connection monitor not available"
         exit 1
@@ -89,7 +92,7 @@ show_summary() {
     echo ""
 
     if [[ -x "$SCRIPT_DIR/connection_monitor.sh" ]]; then
-        "$SCRIPT_DIR/connection_monitor.sh" summary
+        "$SCRIPT_DIR/connection_monitor.sh" summary 2>/dev/null || echo "No connection data available"
     else
         echo "$ERROR Connection monitor not available"
     fi
@@ -130,7 +133,7 @@ download_status() {
     echo ""
 
     if [[ -x "$SCRIPT_DIR/download_protector.sh" ]]; then
-        "$SCRIPT_DIR/download_protector.sh" details
+        "$SCRIPT_DIR/download_protector.sh" status 2>/dev/null || echo "Download protector status unavailable"
     else
         echo "$ERROR Download protector not available"
     fi
