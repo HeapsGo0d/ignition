@@ -86,4 +86,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
   CMD curl -f http://127.0.0.1:8188/ || exit 1
 
 # Entrypoint
-ENTRYPOINT ["/workspace/scripts/startup-clean.sh"]
+ENTRYPOINT ["/workspace/scripts/startup.sh"]
