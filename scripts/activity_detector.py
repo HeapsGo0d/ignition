@@ -117,6 +117,13 @@ class ActivityPattern:
                 match_factors.append(f"command:{pattern}")
                 break
 
+        # Special case for pip: if command is python but cmdline contains pip, allow it
+        if not command_match and any('python' in cmd for cmd in self.command_patterns):
+            if self._matches_pattern('python', proc_info.command) and any('pip' in arg for arg in proc_info.cmdline):
+                command_match = True
+                confidence += 0.3
+                match_factors.append("command:python-pip")
+
         if not command_match:
             return None  # Must match at least one command pattern
 
@@ -153,14 +160,31 @@ class ActivityPattern:
         return confidence
 
     def _matches_pattern(self, pattern: str, text: str) -> bool:
-        """Check if pattern matches text (supports regex)"""
+        """Check if pattern matches text (supports regex and command names)"""
         if pattern.startswith('regex:'):
             try:
                 return bool(re.search(pattern[6:], text, re.IGNORECASE))
             except re.error:
                 return False
         else:
-            return pattern.lower() in text.lower()
+            # Handle command name matching for full paths
+            # e.g., "python3" should match "/opt/conda/bin/python3.11"
+            pattern_lower = pattern.lower()
+            text_lower = text.lower()
+
+            # Direct substring match
+            if pattern_lower in text_lower:
+                return True
+
+            # For command patterns, also check if the command basename matches
+            # e.g., "python3" matches "/opt/conda/bin/python3.11"
+            if '/' in text_lower:
+                basename = text_lower.split('/')[-1]
+                # Check if pattern matches the basename or basename starts with pattern
+                if pattern_lower == basename or basename.startswith(pattern_lower):
+                    return True
+
+            return False
 
     def _check_modifier(self, modifier: str, proc_info: ProcessInfo, cmdline: str) -> bool:
         """Check confidence modifier conditions"""
