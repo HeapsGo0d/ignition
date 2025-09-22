@@ -320,7 +320,14 @@ class ActivityDetector:
         self.patterns: List[ActivityPattern] = []
         self.health_check = SmartHealthCheck()
         self.active_activities: Dict[int, DetectedActivity] = {}  # pid -> activity
-        self.process_monitor: Optional[ContainerProcessMonitor] = None
+
+        # Initialize process monitor
+        try:
+            from process_monitor import ContainerProcessMonitor
+            self.process_monitor = ContainerProcessMonitor()
+        except Exception as e:
+            print(f"Warning: Could not initialize process monitor: {e}")
+            self.process_monitor = None
 
         # Load activity patterns
         self._load_patterns()
