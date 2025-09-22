@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.8.0",
-  "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v1.8.0",
+  "name": "Ignition ComfyUI Latest",
+  "description": "Dynamic ComfyUI with runtime model downloads, modular privacy protection, and clean architecture",
+  "dockerImage": "heapsgo0d/ignition-comfyui:latest",
   "ports": [
     {
       "privatePort": 8188,
@@ -69,6 +69,21 @@
       "description": "Password for file browser access"
     },
     {
+      "key": "PRIVACY_ENABLED",
+      "value": "true",
+      "description": "Enable network privacy protection (true/false)"
+    },
+    {
+      "key": "MONITORING_ONLY",
+      "value": "false",
+      "description": "Monitoring only mode - log but don't block (true/false)"
+    },
+    {
+      "key": "BLOCK_TELEMETRY",
+      "value": "true",
+      "description": "Block telemetry domains (true/false)"
+    },
+    {
       "key": "COMFYUI_PORT",
       "value": "8188",
       "description": "ComfyUI web interface port"
@@ -79,5 +94,5 @@
       "description": "File browser port"
     }
   ],
-  "startScript": "bash /workspace/scripts/startup.sh"
+  "startScript": "bash /workspace/scripts/startup-clean.sh"
 }

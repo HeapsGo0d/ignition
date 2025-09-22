@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v1.0"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace"
+TEMPLATE_NAME="Ignition ComfyUI v2.0 - Clean Architecture"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, modular privacy protection, and clean architecture"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
@@ -33,7 +33,7 @@ print_banner() {
     echo -e "${CYAN}"
     echo "╔═══════════════════════════════════════════╗"
     echo "║           🚀 IGNITION TEMPLATE           ║"
-    echo "║        RunPod Template Creator v1.0       ║"
+    echo "║      RunPod Template Creator v2.0         ║"
     echo "╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -163,6 +163,24 @@ get_configuration() {
     FILEBROWSER_PASSWORD=${input_password:-runpod}
     echo ""
 
+    # Privacy settings with defaults
+    echo -e "${BLUE}Privacy Settings:${NC}"
+    read -p "Enable network privacy protection [true]: " input_privacy
+    PRIVACY_ENABLED=${input_privacy:-true}
+
+    if [[ "$PRIVACY_ENABLED" == "true" ]]; then
+        read -p "Start in monitoring only mode (log but don't block) [false]: " input_monitoring
+        MONITORING_ONLY=${input_monitoring:-false}
+        read -p "Block telemetry domains [true]: " input_telemetry
+        BLOCK_TELEMETRY=${input_telemetry:-true}
+        echo "  → Privacy protection enabled with blocking: $([ "$MONITORING_ONLY" == "false" ] && echo "YES" || echo "NO (monitoring only)")"
+    else
+        MONITORING_ONLY="false"
+        BLOCK_TELEMETRY="false"
+        echo "  → Privacy protection disabled"
+    fi
+    echo ""
+
     # Note about storage
     echo -e "${BLUE}Storage Note:${NC}"
     echo "Persistence handled by RunPod volume settings:"
@@ -253,6 +271,21 @@ generate_template() {
       "description": "Password for file browser access"
     },
     {
+      "key": "PRIVACY_ENABLED",
+      "value": "$PRIVACY_ENABLED",
+      "description": "Enable network privacy protection (true/false)"
+    },
+    {
+      "key": "MONITORING_ONLY",
+      "value": "$MONITORING_ONLY",
+      "description": "Monitoring only mode - log but don't block (true/false)"
+    },
+    {
+      "key": "BLOCK_TELEMETRY",
+      "value": "$BLOCK_TELEMETRY",
+      "description": "Block telemetry domains (true/false)"
+    },
+    {
       "key": "COMFYUI_PORT",
       "value": "8188",
       "description": "ComfyUI web interface port"
@@ -263,7 +296,7 @@ generate_template() {
       "description": "File browser port"
     }
   ],
-  "startScript": "bash /workspace/scripts/startup.sh"
+  "startScript": "bash /workspace/scripts/startup-clean.sh"
 }
 EOF
 }
@@ -292,6 +325,11 @@ print_summary() {
     echo "  CivitAI VAEs: ${CIVITAI_VAES:-'None specified'}"
     echo "  CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
+    echo ""
+    echo -e "${BLUE}Privacy Configuration:${NC}"
+    echo "  • Privacy Protection: ${PRIVACY_ENABLED}"
+    echo "  • Monitoring Only: ${MONITORING_ONLY}"
+    echo "  • Block Telemetry: ${BLOCK_TELEMETRY}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
     echo "  ComfyUI: http://[pod-id]-8188.proxy.runpod.net"
@@ -416,7 +454,10 @@ deploy_template() {
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
-    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
+    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
+    {"key": "PRIVACY_ENABLED", "value": "$PRIVACY_ENABLED"},
+    {"key": "MONITORING_ONLY", "value": "$MONITORING_ONLY"},
+    {"key": "BLOCK_TELEMETRY", "value": "$BLOCK_TELEMETRY"}
   ]
 }
 EOF
