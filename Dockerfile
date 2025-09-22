@@ -17,21 +17,25 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies (streamlined)
+# Install system dependencies and Python 3.12
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core system tools
-    curl wget git git-lfs vim jq \
-    # Python and development
-    python3.12 python3.12-dev python3.12-venv python3-pip \
+    curl wget git git-lfs vim jq software-properties-common \
     # Media processing
     ffmpeg libgl1-mesa-glx libglib2.0-0 \
     # Download tools
     aria2 \
     # Basic networking (minimal privacy tools)
     iptables iproute2 dnsutils \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-dev python3.12-venv \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+    && update-alternatives --set python3 /usr/bin/python3.12 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 
 # Install core Python packages
 RUN python3 -m pip install --upgrade pip setuptools wheel && \
