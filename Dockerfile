@@ -17,7 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies and Python 3.12
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core system tools
     curl wget git git-lfs vim jq software-properties-common \
@@ -27,12 +27,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     aria2 \
     # Basic networking (minimal privacy tools)
     iptables iproute2 dnsutils \
-    && add-apt-repository ppa:deadsnakes/ppa \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Python 3.12 repository and install
+RUN add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    python3.12 python3.12-dev python3.12-venv \
-    && rm -rf /var/lib/apt/lists/* \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Setup Python 3.12 as default and install pip
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
     && update-alternatives --set python3 /usr/bin/python3.12 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 1 \
     && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
