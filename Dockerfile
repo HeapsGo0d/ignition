@@ -1,15 +1,16 @@
 # Ignition ComfyUI - Clean Refactor
-# Single-stage Dockerfile following kodxana/comfyui-base patterns
+# Minimal CUDA-enabled PyTorch on Ubuntu 22.04 following proven patterns
 # Optimized for RTX 5090 and clean architecture
 
 FROM ubuntu:22.04
 
-# Environment setup
+# Environment setup following proven pattern
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
-    PIP_NO_CACHE_DIR=1 \
     XDG_CACHE_HOME=/workspace/.cache \
     HF_HOME=/workspace/.cache/huggingface \
     HUGGINGFACE_HUB_CACHE=/workspace/.cache/huggingface
@@ -17,7 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies including Python 3.10 (Ubuntu 22.04 default)
+# Install system dependencies with proper pip upgrade (proven pattern)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core system tools
     curl wget git git-lfs vim jq \
@@ -29,15 +30,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     aria2 \
     # Basic networking (minimal privacy tools)
     iptables iproute2 dnsutils \
-    && rm -rf /var/lib/apt/lists/* \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && python -m pip install --upgrade pip setuptools wheel \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install core Python packages
-RUN python3 -m pip install --upgrade pip setuptools wheel && \
-    python3 -m pip install \
-    # PyTorch with CUDA 11.8 support (most stable, widely supported)
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
-    # Core dependencies
+# Install CUDA-enabled PyTorch (proven pattern - separate for caching)
+RUN python -m pip install \
+    --index-url https://download.pytorch.org/whl/cu121 \
+    torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1
+
+# CUDA sanity check at build time
+RUN python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA version:', torch.version.cuda)"
+
+# Install other Python dependencies separately
+RUN python -m pip install \
     requests aiohttp aiofiles huggingface-hub tqdm pillow numpy opencv-python
 
 # Install ComfyUI
