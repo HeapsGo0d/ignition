@@ -35,8 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install core Python packages
 RUN python3 -m pip install --upgrade pip setuptools wheel && \
     python3 -m pip install \
-    # PyTorch with CUDA 12.8 support for RTX 5090
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \
+    # PyTorch with CUDA 11.8 support (most stable, widely supported)
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 \
     # Core dependencies
     requests aiohttp aiofiles huggingface-hub tqdm pillow numpy opencv-python
 
