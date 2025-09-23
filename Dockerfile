@@ -18,44 +18,40 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies with proper pip upgrade (proven pattern)
+# Install system dependencies (minimal specification for RTX 5090)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Core system tools
-    curl wget git git-lfs vim jq \
-    # Python and development (using system Python 3.10)
-    python3 python3-dev python3-venv python3-pip \
-    # Media processing
-    ffmpeg libgl1-mesa-glx libglib2.0-0 \
-    # Download tools
-    aria2 \
-    # Basic networking (minimal privacy tools)
-    iptables iproute2 dnsutils \
-    && ln -s /usr/bin/python3 /usr/bin/python \
-    && python -m pip install --upgrade pip setuptools wheel \
-    && rm -rf /var/lib/apt/lists/*
+    python3 python3-venv python3-pip ca-certificates \
+    git curl ffmpeg git-lfs aria2 wget jq \
+    libgl1-mesa-glx libglib2.0-0 \
+    psmisc procps iproute2 net-tools dnsutils \
+    # Privacy tools
+    iptables vim \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install -U pip setuptools wheel packaging
 
-# Install CUDA-enabled PyTorch (proven pattern - separate for caching)
-RUN python -m pip install \
-    --index-url https://download.pytorch.org/whl/cu121 \
-    torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1
+# Install PyTorch cu128 (RTX 5090 Blackwell sm_120 support)
+ENV PIP_ONLY_BINARY=:all:
+RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1
+ENV PIP_ONLY_BINARY=
 
-# CUDA sanity check at build time
-RUN python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA version:', torch.version.cuda)"
-
-# Install other Python dependencies separately
-RUN python -m pip install \
+# Install other Python dependencies with binary protection
+RUN PIP_ONLY_BINARY=:all: python -m pip install \
     requests aiohttp aiofiles huggingface-hub tqdm pillow numpy opencv-python
 
-# Install ComfyUI
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
+# Install ComfyUI with pre-filtering (block fragile CUDA extensions)
+RUN echo -e "xformers\nflash-attn\nflash_attn\nflash_attn_2\nonnxruntime-gpu" > /tmp/deny.txt && \
+    git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     cd /workspace/ComfyUI && \
-    python3 -m pip install -r requirements.txt
+    grep -v -f /tmp/deny.txt requirements.txt > /tmp/reqs.safe && \
+    PIP_ONLY_BINARY=:all: pip install --no-cache-dir -r /tmp/reqs.safe
 
-# Install ComfyUI-Manager
+# Install ComfyUI-Manager with same protections
 RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     cd ComfyUI-Manager && \
-    python3 -m pip install -r requirements.txt
+    grep -v -f /tmp/deny.txt requirements.txt > /tmp/mgr_reqs.safe && \
+    PIP_ONLY_BINARY=:all: pip install --no-cache-dir -r /tmp/mgr_reqs.safe
 
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet,diffusion_models,text_encoders,clip,unet}

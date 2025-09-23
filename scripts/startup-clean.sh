@@ -68,8 +68,8 @@ export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║              🚀 IGNITION v2.0            ║"
-    log "INFO" "║        Clean Architecture Edition         ║"
+    log "INFO" "║              🚀 IGNITION v2.1            ║"
+    log "INFO" "║       RTX 5090 Blackwell Edition         ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""
 }
@@ -101,6 +101,12 @@ check_system() {
         log "INFO" "  • GPU Detected: $GPU_INFO"
     else
         log "WARN" "  • No NVIDIA GPU detected"
+    fi
+
+    # Optional RTX 5090 Blackwell sanity check (runtime only)
+    if [[ "${SANITY:-0}" == "1" ]]; then
+        log "INFO" "  • Running RTX 5090 Blackwell sanity check..."
+        python /workspace/scripts/sanity.py || log "WARN" "Sanity check failed"
     fi
 
     log "INFO" "✅ System requirements check complete"
