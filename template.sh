@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v2.0 - Clean Architecture"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, modular privacy protection, and clean architecture"
+TEMPLATE_NAME="Ignition ComfyUI v2.2 - Minimal Privacy"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, minimal privacy system with Big Red Switch, and clean architecture"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
@@ -163,21 +163,25 @@ get_configuration() {
     FILEBROWSER_PASSWORD=${input_password:-runpod}
     echo ""
 
-    # Privacy settings with defaults
-    echo -e "${BLUE}Privacy Settings:${NC}"
-    read -p "Enable network privacy protection [true]: " input_privacy
+    # Minimal Privacy settings with defaults
+    echo -e "${BLUE}Minimal Privacy Settings:${NC}"
+    read -p "Enable minimal privacy system [true]: " input_privacy
     PRIVACY_ENABLED=${input_privacy:-true}
 
     if [[ "$PRIVACY_ENABLED" == "true" ]]; then
-        read -p "Start in monitoring only mode (log but don't block) [false]: " input_monitoring
-        MONITORING_ONLY=${input_monitoring:-false}
-        read -p "Block telemetry domains [true]: " input_telemetry
-        BLOCK_TELEMETRY=${input_telemetry:-true}
-        echo "  → Privacy protection enabled with blocking: $([ "$MONITORING_ONLY" == "false" ] && echo "YES" || echo "NO (monitoring only)")"
+        read -p "Enable strict mode (deny-by-default networking) [0]: " input_strict
+        local strict_input=${input_strict:-0}
+        STRICT_MODE=$([[ "$strict_input" =~ ^(1|true|yes)$ ]] && echo "1" || echo "0")
+
+        read -p "Allow updates window (GitHub/PyPI access) [0]: " input_updates
+        local updates_input=${input_updates:-0}
+        PRIV_ALLOW_UPDATES=$([[ "$updates_input" =~ ^(1|true|yes)$ ]] && echo "1" || echo "0")
+
+        echo "  → Minimal privacy enabled - STRICT_MODE: $STRICT_MODE, Updates: $PRIV_ALLOW_UPDATES"
     else
-        MONITORING_ONLY="false"
-        BLOCK_TELEMETRY="false"
-        echo "  → Privacy protection disabled"
+        STRICT_MODE="0"
+        PRIV_ALLOW_UPDATES="0"
+        echo "  → Minimal privacy disabled"
     fi
     echo ""
 
@@ -273,17 +277,27 @@ generate_template() {
     {
       "key": "PRIVACY_ENABLED",
       "value": "$PRIVACY_ENABLED",
-      "description": "Enable network privacy protection (true/false)"
+      "description": "Enable minimal privacy system (true/false)"
     },
     {
-      "key": "MONITORING_ONLY",
-      "value": "$MONITORING_ONLY",
-      "description": "Monitoring only mode - log but don't block (true/false)"
+      "key": "STRICT_MODE",
+      "value": "$STRICT_MODE",
+      "description": "Enable strict mode deny-by-default networking (0/1)"
     },
     {
-      "key": "BLOCK_TELEMETRY",
-      "value": "$BLOCK_TELEMETRY",
-      "description": "Block telemetry domains (true/false)"
+      "key": "PRIVACY_BYPASS",
+      "value": "0",
+      "description": "Break-glass privacy bypass - DANGER (0/1)"
+    },
+    {
+      "key": "PRIV_ALLOW_UPDATES",
+      "value": "$PRIV_ALLOW_UPDATES",
+      "description": "Enable updates window for GitHub/PyPI (0/1)"
+    },
+    {
+      "key": "PROXY_PORT",
+      "value": "8888",
+      "description": "Minimal proxy port"
     },
     {
       "key": "COMFYUI_PORT",
@@ -326,10 +340,10 @@ print_summary() {
     echo "  CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     echo ""
-    echo -e "${BLUE}Privacy Configuration:${NC}"
+    echo -e "${BLUE}Minimal Privacy Configuration:${NC}"
     echo "  • Privacy Protection: ${PRIVACY_ENABLED}"
-    echo "  • Monitoring Only: ${MONITORING_ONLY}"
-    echo "  • Block Telemetry: ${BLOCK_TELEMETRY}"
+    echo "  • Strict Mode: ${STRICT_MODE}"
+    echo "  • Updates Window: ${PRIV_ALLOW_UPDATES}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
     echo "  ComfyUI: http://[pod-id]-8188.proxy.runpod.net"
@@ -373,11 +387,20 @@ Once your pod is running:
 | \`CIVITAI_MODELS\` | CivitAI model version IDs | \`138977,46846,5616\` |
 | \`HUGGINGFACE_MODELS\` | HuggingFace model keys | \`flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev\` |
 
-### Optional Authentication  
+### Optional Authentication
 | Variable | Description | Get Token From |
 |----------|-------------|----------------|
 | \`CIVITAI_TOKEN\` | CivitAI API token | https://civitai.com/user/account |
 | \`HF_TOKEN\` | HuggingFace token | https://huggingface.co/settings/tokens |
+
+### Minimal Privacy System (Big Red Switch)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| \`PRIVACY_ENABLED\` | Enable minimal privacy proxy system | \`true\` |
+| \`STRICT_MODE\` | Deny-by-default networking (0/1) | \`0\` |
+| \`PRIVACY_BYPASS\` | Break-glass bypass - DANGER (0/1) | \`0\` |
+| \`PRIV_ALLOW_UPDATES\` | Enable GitHub/PyPI updates window (0/1) | \`0\` |
+| \`PROXY_PORT\` | Minimal proxy port | \`8888\` |
 
 ### Storage Configuration
 Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_GB}GB volume)
@@ -456,8 +479,10 @@ deploy_template() {
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
     {"key": "PRIVACY_ENABLED", "value": "$PRIVACY_ENABLED"},
-    {"key": "MONITORING_ONLY", "value": "$MONITORING_ONLY"},
-    {"key": "BLOCK_TELEMETRY", "value": "$BLOCK_TELEMETRY"}
+    {"key": "STRICT_MODE", "value": "$STRICT_MODE"},
+    {"key": "PRIVACY_BYPASS", "value": "0"},
+    {"key": "PRIV_ALLOW_UPDATES", "value": "$PRIV_ALLOW_UPDATES"},
+    {"key": "PROXY_PORT", "value": "8888"}
   ]
 }
 EOF
