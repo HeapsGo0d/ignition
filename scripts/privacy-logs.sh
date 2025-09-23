@@ -278,7 +278,7 @@ case "${1:-daily}" in
         echo "Proxy log: $PROXY_LOG"
 
         if [[ -f "$PROXY_LOG" ]]; then
-            local size=$(stat -f%z "$PROXY_LOG" 2>/dev/null || stat -c%s "$PROXY_LOG" 2>/dev/null || echo "0")
+            size=$(stat -f%z "$PROXY_LOG" 2>/dev/null || stat -c%s "$PROXY_LOG" 2>/dev/null || echo "0")
             echo "Proxy log size: $size bytes (limit: $MAX_LOG_SIZE)"
         else
             echo "Proxy log: NOT FOUND"

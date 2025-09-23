@@ -300,7 +300,7 @@ case "${1:-start}" in
 
     "status")
         if [[ -f /tmp/proxy.pid ]]; then
-            local proxy_pid=$(cat /tmp/proxy.pid)
+            proxy_pid=$(cat /tmp/proxy.pid)
             if kill -0 $proxy_pid 2>/dev/null; then
                 log "INFO" "Proxy is running (PID: $proxy_pid)"
                 netstat -tln | grep ":$PROXY_PORT " || log "WARN" "Port not listening"
