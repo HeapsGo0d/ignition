@@ -106,7 +106,29 @@ check_system() {
     # Optional RTX 5090 Blackwell sanity check (runtime only)
     if [[ "${SANITY:-0}" == "1" ]]; then
         log "INFO" "  • Running RTX 5090 Blackwell sanity check..."
-        python /workspace/scripts/sanity.py || log "WARN" "Sanity check failed"
+        python3 /workspace/scripts/sanity.py || log "WARN" "Sanity check failed"
+
+        log "INFO" "  • Running post-boot acceptance checks..."
+        log "INFO" "    - Torch version: $(python3 -c 'import torch; print(torch.__version__)')"
+        log "INFO" "    - CUDA version: $(python3 -c 'import torch; print(torch.version.cuda)')"
+        log "INFO" "    - Device: $(python3 -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")')"
+        log "INFO" "    - Capability: $(python3 -c 'import torch; print(torch.cuda.get_device_capability(0) if torch.cuda.is_available() else "N/A")')"
+
+        # Validate no fragile packages are present
+        log "INFO" "  • Checking for fragile CUDA packages..."
+        FRAGILE_FOUND=$(python3 -m pip freeze | grep -i -E 'torch|triton|xformers|flash|onnxruntime' || true)
+        if [[ -n "$FRAGILE_FOUND" ]]; then
+            log "INFO" "    - Found packages: $FRAGILE_FOUND"
+            # Check for specifically denied packages
+            DENIED_FOUND=$(echo "$FRAGILE_FOUND" | grep -i -E 'xformers|flash-attn|flash_attn|onnxruntime-gpu' || true)
+            if [[ -n "$DENIED_FOUND" ]]; then
+                log "WARN" "    - ⚠️ Found denied packages: $DENIED_FOUND"
+            else
+                log "INFO" "    - ✅ No denied packages found"
+            fi
+        else
+            log "INFO" "    - ✅ No torch-related packages detected"
+        fi
     fi
 
     log "INFO" "✅ System requirements check complete"

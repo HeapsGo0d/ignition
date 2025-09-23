@@ -19,39 +19,42 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /workspace
 
 # Install system dependencies (minimal specification for RTX 5090)
+# Note: Image will be >1-2GB due to cu128 PyTorch wheels - this is normal for minimal path
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip ca-certificates \
     git curl ffmpeg git-lfs aria2 wget jq \
-    libgl1-mesa-glx libglib2.0-0 \
+    libglib2.0-0 \
     psmisc procps iproute2 net-tools dnsutils \
     # Privacy tools
     iptables vim \
-    && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pip install -U pip setuptools wheel packaging
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade tooling first
+RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel packaging
 
 # Install PyTorch cu128 (RTX 5090 Blackwell sm_120 support)
-ENV PIP_ONLY_BINARY=:all:
-RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
+# Isolated cu128 index - no global PIP_INDEX_URL leaks to later installs
+RUN PIP_ONLY_BINARY=:all: python3 -m pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cu128 \
     torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1
-ENV PIP_ONLY_BINARY=
 
 # Install other Python dependencies with binary protection
-RUN PIP_ONLY_BINARY=:all: python -m pip install \
-    requests aiohttp aiofiles huggingface-hub tqdm pillow numpy opencv-python
+RUN PIP_ONLY_BINARY=:all: python3 -m pip install --no-cache-dir \
+    requests aiohttp aiofiles huggingface-hub tqdm pillow numpy opencv-python-headless
 
-# Install ComfyUI with pre-filtering (block fragile CUDA extensions)
-RUN echo -e "xformers\nflash-attn\nflash_attn\nflash_attn_2\nonnxruntime-gpu" > /tmp/deny.txt && \
+# Install ComfyUI with pre-filtering (block ALL CUDA-fragile extensions)
+RUN echo -e "xformers\nflash-attn\nflash_attn\nflash_attn_2\nonnxruntime-gpu\nonnxruntime" > /tmp/deny.txt && \
     git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     cd /workspace/ComfyUI && \
     grep -v -f /tmp/deny.txt requirements.txt > /tmp/reqs.safe && \
-    PIP_ONLY_BINARY=:all: pip install --no-cache-dir -r /tmp/reqs.safe
+    PIP_ONLY_BINARY=:all: python3 -m pip install --no-cache-dir -r /tmp/reqs.safe
 
 # Install ComfyUI-Manager with same protections
 RUN cd /workspace/ComfyUI/custom_nodes && \
     git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     cd ComfyUI-Manager && \
     grep -v -f /tmp/deny.txt requirements.txt > /tmp/mgr_reqs.safe && \
-    PIP_ONLY_BINARY=:all: pip install --no-cache-dir -r /tmp/mgr_reqs.safe
+    PIP_ONLY_BINARY=:all: python3 -m pip install --no-cache-dir -r /tmp/mgr_reqs.safe
 
 # Create model directories
 RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,embeddings,controlnet,diffusion_models,text_encoders,clip,unet}
@@ -78,6 +81,10 @@ ENV CIVITAI_MODELS="" \
     COMFYUI_PORT="8188" \
     FILEBROWSER_PORT="8080" \
     PRIVACY_ENABLED="true"
+
+# Debug flags (runtime only - do not set by default):
+# SANITY=1              - Enable RTX 5090 Blackwell validation
+# CUDA_LAUNCH_BLOCKING=1 - Enable synchronous CUDA for debugging
 
 # Expose ports
 EXPOSE 8188 8080

@@ -5,13 +5,24 @@ Runtime probe for CUDA compatibility validation
 """
 
 import torch
+import sys
 
 print("torch", torch.__version__, "cuda", torch.version.cuda)
+
+# Assert exact CUDA version for RTX 5090 Blackwell support
+if torch.version.cuda != "12.8":
+    print(f"❌ Expected CUDA 12.8, got {torch.version.cuda}")
+    sys.exit(1)
 
 if torch.cuda.is_available():
     dev = torch.cuda.get_device_name(0)
     cap = torch.cuda.get_device_capability(0)
     print("device:", dev, "capability:", cap)
+
+    # Assert minimum capability for Blackwell
+    if cap < (12, 0):
+        print(f"❌ Expected capability >= (12, 0), got {cap}")
+        sys.exit(1)
 
     # Simple CUDA smoke test
     x = torch.rand(1, device="cuda")
@@ -31,6 +42,10 @@ if torch.cuda.is_available():
         print("✅ Matrix operations working")
     except Exception as e:
         print("❌ Matrix operation failed:", str(e))
+        sys.exit(1)
 
 else:
     print("❌ CUDA not available (runtime)")
+    sys.exit(1)
+
+print("✅ RTX 5090 Blackwell sanity check passed")
