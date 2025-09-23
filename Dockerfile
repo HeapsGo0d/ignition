@@ -25,8 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ffmpeg git-lfs aria2 wget jq \
     libglib2.0-0 \
     psmisc procps iproute2 net-tools dnsutils \
-    # Privacy tools
-    iptables vim \
+    # Privacy tools and minimal proxy
+    iptables vim privoxy tinyproxy \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade tooling first
@@ -62,6 +62,18 @@ RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,loras,vae,upscale_models,emb
 # Create cache directories
 RUN mkdir -p /workspace/.cache/huggingface
 
+# Create minimal privacy system directories and allowlist
+RUN mkdir -p /workspace/logs/privacy /workspace/privacy && \
+    echo "# Minimal Privacy Allowlist - Evidence-Based Domains Only" > /workspace/privacy/allowlist.txt && \
+    echo "# HuggingFace domains" >> /workspace/privacy/allowlist.txt && \
+    echo "*.huggingface.co" >> /workspace/privacy/allowlist.txt && \
+    echo "*.hf.co" >> /workspace/privacy/allowlist.txt && \
+    echo "cdn-lfs.huggingface.co" >> /workspace/privacy/allowlist.txt && \
+    echo "# CivitAI domains" >> /workspace/privacy/allowlist.txt && \
+    echo "civitai.com" >> /workspace/privacy/allowlist.txt && \
+    echo "files.civitai.com" >> /workspace/privacy/allowlist.txt && \
+    echo "# NOTE: PyPI domains added only during PRIV_ALLOW_UPDATES=1" >> /workspace/privacy/allowlist.txt
+
 # Install filebrowser
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
 
@@ -82,6 +94,17 @@ ENV CIVITAI_MODELS="" \
     FILEBROWSER_PORT="8080" \
     PRIVACY_ENABLED="true"
 
+# Minimal Privacy System Configuration
+ENV STRICT_MODE="0" \
+    PRIVACY_BYPASS="0" \
+    PRIV_ALLOW_UPDATES="0" \
+    PROXY_PORT="8888"
+
+# HuggingFace Telemetry Controls (Official Kill-switches)
+ENV HF_HUB_DISABLE_TELEMETRY="1" \
+    HF_HUB_ENABLE_HF_TRANSFER="0" \
+    PIP_DISABLE_PIP_VERSION_CHECK="1"
+
 # Debug flags (runtime only - do not set by default):
 # SANITY=1              - Enable RTX 5090 Blackwell validation
 # CUDA_LAUNCH_BLOCKING=1 - Enable synchronous CUDA for debugging
@@ -89,9 +112,9 @@ ENV CIVITAI_MODELS="" \
 # Expose ports
 EXPOSE 8188 8080
 
-# Healthcheck
+# Healthcheck (with NO_PROXY to avoid polluting privacy logs)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
-  CMD curl -f http://127.0.0.1:8188/ || exit 1
+  CMD NO_PROXY=127.0.0.1,localhost,::1 curl -f http://127.0.0.1:8188/ || exit 1
 
 # Entrypoint
 ENTRYPOINT ["/workspace/scripts/startup-clean.sh"]

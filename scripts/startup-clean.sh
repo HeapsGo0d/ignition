@@ -144,15 +144,65 @@ setup_storage() {
     log "INFO" ""
 }
 
-# Initialize privacy system if enabled
+# Initialize minimal privacy system
 initialize_privacy() {
+    if [[ "${PRIVACY_BYPASS:-0}" == "1" ]]; then
+        log "WARN" "⚠️ PRIVACY BYPASS ACTIVE - ALL NETWORK MONITORING DISABLED"
+        log "INFO" ""
+        return
+    fi
+
     if [[ "$PRIVACY_ENABLED" == "true" ]]; then
-        log "INFO" "🛡️ Initializing privacy protection..."
-        if [[ -x "$SCRIPT_DIR/privacy-init.sh" ]]; then
-            "$SCRIPT_DIR/privacy-init.sh" &
-            log "INFO" "✅ Privacy system started in background"
+        log "INFO" "🛡️ Initializing minimal privacy system..."
+        log "INFO" "  • STRICT_MODE: ${STRICT_MODE:-0}"
+        log "INFO" "  • PROXY_PORT: ${PROXY_PORT:-8888}"
+
+        # Setup log management and daily rotation
+        log "INFO" "  • Setting up privacy logs..."
+        if [[ -x "$SCRIPT_DIR/privacy-logs.sh" ]]; then
+            "$SCRIPT_DIR/privacy-logs.sh" setup
+            # Run daily maintenance on startup
+            "$SCRIPT_DIR/privacy-logs.sh" daily &
+        fi
+
+        # Apply firewall rules if STRICT_MODE enabled
+        if [[ "${STRICT_MODE:-0}" == "1" ]]; then
+            log "INFO" "  • Applying STRICT_MODE firewall rules..."
+            if [[ -x "$SCRIPT_DIR/minimal-firewall.sh" ]]; then
+                "$SCRIPT_DIR/minimal-firewall.sh" start
+            else
+                log "ERROR" "STRICT_MODE enabled but minimal-firewall.sh not found"
+                exit 1
+            fi
+        fi
+
+        # Start proxy system
+        log "INFO" "  • Starting minimal proxy..."
+        if [[ -x "$SCRIPT_DIR/minimal-proxy.sh" ]]; then
+            "$SCRIPT_DIR/minimal-proxy.sh" start
+
+            # Verify proxy is working
+            sleep 2
+            if [[ -f /tmp/proxy.pid ]]; then
+                log "INFO" "✅ Minimal privacy system active"
+
+                # Set proxy environment for ComfyUI process tree
+                if [[ "${STRICT_MODE:-0}" == "1" ]] || [[ "${FORCE_PROXY:-0}" == "1" ]]; then
+                    export HTTP_PROXY="http://127.0.0.1:${PROXY_PORT:-8888}"
+                    export HTTPS_PROXY="http://127.0.0.1:${PROXY_PORT:-8888}"
+                    export NO_PROXY="127.0.0.1,localhost,::1"
+                    log "INFO" "  • Proxy environment configured for all processes"
+                fi
+            else
+                log "ERROR" "Failed to start minimal proxy"
+                if [[ "${STRICT_MODE:-0}" == "1" ]]; then
+                    log "ERROR" "STRICT_MODE requires proxy - failing closed"
+                    exit 1
+                fi
+            fi
         else
-            log "WARN" "Privacy system requested but privacy-init.sh not found"
+            log "ERROR" "Privacy system enabled but minimal-proxy.sh not found"
+            exit 1
         fi
     else
         log "INFO" "🔓 Privacy protection disabled"
