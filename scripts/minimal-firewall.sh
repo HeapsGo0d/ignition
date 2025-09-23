@@ -60,15 +60,38 @@ get_dns_resolver() {
     echo "$resolver_ip"
 }
 
+# Check if we have the necessary capabilities for iptables
+check_capabilities() {
+    if ! iptables -L OUTPUT >/dev/null 2>&1; then
+        log "WARN" "STRICT_MODE requires NET_ADMIN capability for iptables enforcement"
+        log "WARN" "Falling back to monitoring-only mode"
+        log "INFO" "To enable enforcement: docker run --cap-add=NET_ADMIN -e STRICT_MODE=1"
+        return 1
+    fi
+    return 0
+}
+
 # Apply STRICT_MODE iptables rules
 apply_strict_rules() {
+    # Check capabilities first
+    if ! check_capabilities; then
+        log "WARN" "Cannot apply iptables rules - continuing in monitoring-only mode"
+        return 1
+    fi
+
     log "INFO" "Applying STRICT_MODE iptables rules (deny-by-default)"
 
     # Flush existing OUTPUT rules
-    iptables -F OUTPUT 2>/dev/null || true
+    iptables -F OUTPUT 2>/dev/null || {
+        log "ERROR" "Failed to flush iptables rules"
+        return 1
+    }
 
     # Default policy: DROP all outbound
-    iptables -P OUTPUT DROP
+    iptables -P OUTPUT DROP || {
+        log "ERROR" "Failed to set DROP policy"
+        return 1
+    }
 
     # Allow loopback traffic (essential for container operation)
     iptables -A OUTPUT -o lo -j ACCEPT
@@ -186,9 +209,13 @@ case "${1:-start}" in
         disable_ipv6
 
         # Apply strict firewall rules
-        apply_strict_rules
-
-        log "INFO" "Firewall setup complete"
+        if apply_strict_rules; then
+            log "INFO" "✅ STRICT_MODE enforcement active (iptables deny-by-default)"
+            echo "ENFORCEMENT=kernel" > /tmp/privacy_enforcement_mode
+        else
+            log "WARN" "⚠️ STRICT_MODE monitoring-only (no iptables capability)"
+            echo "ENFORCEMENT=user-space" > /tmp/privacy_enforcement_mode
+        fi
         ;;
 
     "stop")

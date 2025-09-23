@@ -207,7 +207,40 @@ initialize_privacy() {
     else
         log "INFO" "🔓 Privacy protection disabled"
     fi
+
+    # Generate privacy system status banner
+    print_privacy_banner
     log "INFO" ""
+}
+
+# Print privacy system status banner
+print_privacy_banner() {
+    local strict_mode="${STRICT_MODE:-0}"
+    local proxy_port="${PROXY_PORT:-8888}"
+    local enforcement_mode="disabled"
+    local allowlist_count="0"
+
+    if [[ "$PRIVACY_ENABLED" == "true" ]]; then
+        # Count allowlist domains
+        if [[ -f "/workspace/privacy/allowlist.txt" ]]; then
+            allowlist_count=$(grep -v '^#' /workspace/privacy/allowlist.txt | grep -v '^$' | wc -l)
+        fi
+
+        # Determine enforcement mode
+        if [[ "$strict_mode" == "1" ]]; then
+            if [[ -f /tmp/privacy_enforcement_mode ]]; then
+                enforcement_mode=$(cat /tmp/privacy_enforcement_mode | cut -d'=' -f2)
+            else
+                enforcement_mode="user-space"
+            fi
+        else
+            enforcement_mode="monitoring"
+        fi
+
+        log "INFO" "🛡️ STRICT_MODE=$strict_mode ENFORCEMENT=$enforcement_mode PROXY=127.0.0.1:$proxy_port ALLOWLIST=$allowlist_count"
+    else
+        log "INFO" "🔓 STRICT_MODE=0 ENFORCEMENT=disabled PROXY=none ALLOWLIST=0"
+    fi
 }
 
 # Download models using existing script

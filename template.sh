@@ -177,6 +177,15 @@ get_configuration() {
         local updates_input=${input_updates:-0}
         PRIV_ALLOW_UPDATES=$([[ "$updates_input" =~ ^(1|true|yes)$ ]] && echo "1" || echo "0")
 
+        # Ask about capabilities for STRICT_MODE enforcement
+        if [[ "$STRICT_MODE" == "1" ]]; then
+            read -p "Request NET_ADMIN capability for iptables enforcement [true]: " input_netadmin
+            REQUEST_NET_ADMIN=${input_netadmin:-true}
+            echo "  → STRICT_MODE enforcement: $([[ "$REQUEST_NET_ADMIN" == "true" ]] && echo "iptables (with NET_ADMIN)" || echo "monitoring-only")"
+        else
+            REQUEST_NET_ADMIN="false"
+        fi
+
         echo "  → Minimal privacy enabled - STRICT_MODE: $STRICT_MODE, Updates: $PRIV_ALLOW_UPDATES"
     else
         STRICT_MODE="0"
@@ -309,7 +318,12 @@ generate_template() {
       "value": "8080", 
       "description": "File browser port"
     }
-  ],
+  ],$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo '
+  "securityContext": {
+    "capabilities": {
+      "add": ["NET_ADMIN"]
+    }
+  },'; fi)
   "startScript": "bash /workspace/scripts/startup-clean.sh"
 }
 EOF
@@ -344,6 +358,9 @@ print_summary() {
     echo "  • Privacy Protection: ${PRIVACY_ENABLED}"
     echo "  • Strict Mode: ${STRICT_MODE}"
     echo "  • Updates Window: ${PRIV_ALLOW_UPDATES}"
+    if [[ "$STRICT_MODE" == "1" ]]; then
+        echo "  • Capabilities: $([[ "$REQUEST_NET_ADMIN" == "true" ]] && echo "NET_ADMIN requested (iptables enforcement)" || echo "No capabilities (monitoring-only)")"
+    fi
     echo ""
     echo -e "${BLUE}Access:${NC}"
     echo "  ComfyUI: http://[pod-id]-8188.proxy.runpod.net"
@@ -418,13 +435,41 @@ Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_
 2. Copy the full path from URL
 3. Example: For FLUX workflow use \`flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev\` (complete set with KREA variant)
 
+## Privacy System Operation
+
+### Two-Mode Enforcement
+The minimal privacy system operates in two modes:
+
+**Kernel Mode (with NET_ADMIN capability)**:
+- ✅ Full iptables enforcement
+- ✅ Deny-by-default networking in STRICT_MODE
+- ✅ Only allowlisted domains can connect
+
+**User-Space Mode (without capabilities)**:
+- ✅ Proxy logging of all connections
+- ⚠️ Monitoring-only in STRICT_MODE
+- ⚠️ Enforcement relies on proxy environment variables
+
+### Startup Banner
+Look for this line in startup logs:
+\`\`\`
+🛡️ STRICT_MODE=1 ENFORCEMENT=kernel PROXY=127.0.0.1:8888 ALLOWLIST=5
+\`\`\`
+
+### Requesting Capabilities
+To enable kernel mode enforcement:
+1. Template must include NET_ADMIN capability request
+2. RunPod deployment will have full iptables enforcement
+3. STRICT_MODE will block non-allowlisted domains
+
 ## Startup Process
 
 1. 🔍 System check
-2. 💾 Storage setup  
-3. 📥 Model downloads (parallel)
-4. 📁 File browser start (port 8080)
-5. 🎨 ComfyUI start (port 8188)
+2. 🛡️ Privacy system initialization
+3. 💾 Storage setup
+4. 📥 Model downloads (parallel)
+5. 📁 File browser start (port 8080)
+6. 🎨 ComfyUI start (port 8188)
 
 ## Troubleshooting
 
@@ -436,6 +481,12 @@ Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_
 - **No models downloading**: Check model IDs are correct
 - **Out of space**: Use persistent storage or smaller models
 - **Slow downloads**: Add API tokens for authentication
+
+### Privacy System Issues
+- **STRICT_MODE not enforcing**: Check startup banner for enforcement mode
+- **Need iptables enforcement**: Request NET_ADMIN capability in template
+- **Proxy not logging**: Check \`/workspace/logs/privacy/proxy.log\`
+- **Update window not working**: Use \`/workspace/scripts/privacy-update-window.sh test\`
 
 ---
 **🚀 Ready to create amazing AI art with Ignition!**
@@ -483,7 +534,12 @@ deploy_template() {
     {"key": "PRIVACY_BYPASS", "value": "0"},
     {"key": "PRIV_ALLOW_UPDATES", "value": "$PRIV_ALLOW_UPDATES"},
     {"key": "PROXY_PORT", "value": "8888"}
-  ]
+  ]$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo ',
+  "securityContext": {
+    "capabilities": {
+      "add": ["NET_ADMIN"]
+    }
+  }'; fi)
 }
 EOF
 )
