@@ -345,7 +345,9 @@ validate_cleanup_path() {
         "/var"
         "/home"
         "/root"
-        "/workspace/ComfyUI"
+        "/workspace/ComfyUI/main.py"
+        "/workspace/ComfyUI/web"
+        "/workspace/ComfyUI/nodes"
         "/workspace/scripts"
         ""
     )
