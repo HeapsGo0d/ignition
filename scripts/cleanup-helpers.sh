@@ -108,6 +108,16 @@ get_size_gb() {
 
 get_size_mb() {
     local path="$1"
+
+    # Check if this is a model directory and use cached size if available
+    if is_model_directory "$path" && [[ "$CLEANUP_SCAN_MODELS" != "1" ]]; then
+        log "DEBUG" "Using cached size for model directory (MB): $path"
+        local cached_gb=$(get_cached_model_size)
+        awk "BEGIN {printf \"%.1f\", $cached_gb * 1024}"
+        return 0
+    fi
+
+    # Fall back to direct calculation for non-model paths
     if [[ ! -e "$path" ]]; then
         echo "0.0"
         return 0
@@ -764,9 +774,9 @@ safe_delete() {
         return 0
     fi
 
-    # Calculate size before deletion
+    # Calculate size before deletion (with model directory exclusions for performance)
     local size_mb=$(get_size_mb "$path")
-    local file_count=$(count_files "$path")
+    local file_count=$(count_files "$path" 1)  # 1 = exclude models for performance
 
     # Dry run mode
     if [[ "$dry_run" == "1" ]]; then
