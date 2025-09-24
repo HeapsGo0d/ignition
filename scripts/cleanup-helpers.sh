@@ -20,6 +20,8 @@ readonly IEC_PINS_FILE="$IEC_POLICY_DIR/pins.txt"
 readonly IEC_CLEANUP_LOG="$IEC_DATA_LOGS/cleanup.log"
 readonly IEC_LOCK_FILE="/tmp/cleanup.lock"
 readonly IEC_SESSION_LOCK="/tmp/stale_session.lock"
+readonly IEC_MODEL_CACHE="$IEC_POLICY_DIR/model_sizes.cache"
+readonly IEC_MODEL_CACHE_INVALIDATE="$IEC_POLICY_DIR/model_sizes.cache.invalidate"
 
 # Environment defaults
 export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
@@ -27,6 +29,13 @@ export IEC_BUDGET_GB="${IEC_BUDGET_GB:-10}"
 export IEC_TIMEOUT_SEC="${IEC_TIMEOUT_SEC:-30}"
 export IEC_DRY_RUN="${IEC_DRY_RUN:-0}"
 export CLEANUP_IGNORE_PINS="${CLEANUP_IGNORE_PINS:-0}"
+
+# Model directory optimization
+export MODEL_DIRS_SKIP="${MODEL_DIRS_SKIP:-/workspace/ComfyUI/models /workspace/models}"
+export MODEL_CACHE_TTL_SEC="${MODEL_CACHE_TTL_SEC:-3600}"
+export CLEANUP_SCAN_MODELS="${CLEANUP_SCAN_MODELS:-0}"
+export CLEANUP_DELETE_MODELS="${CLEANUP_DELETE_MODELS:-0}"
+export CLEANUP_ALLOW_MOUNTS="${CLEANUP_ALLOW_MOUNTS:-0}"
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -85,38 +94,16 @@ print_iec_banner() {
 # Size calculation utilities with robust error handling
 get_size_gb() {
     local path="$1"
-    if [[ ! -e "$path" ]]; then
-        echo "0.00"
+
+    # Check if this is a model directory and use cached size if available
+    if is_model_directory "$path" && [[ "$CLEANUP_SCAN_MODELS" != "1" ]]; then
+        log "DEBUG" "Using cached size for model directory: $path"
+        get_cached_model_size
         return 0
     fi
 
-    local du_output
-    du_output=$(du -sb "$path" 2>/dev/null)
-    local du_exit=$?
-
-    if [[ $du_exit -ne 0 || -z "$du_output" ]]; then
-        log "DEBUG" "du command failed for path: $path"
-        echo "0.00"
-        return 0
-    fi
-
-    # Validate du output format (should be "SIZE\tPATH")
-    local size_bytes=$(echo "$du_output" | awk '{print $1}')
-    if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
-        log "DEBUG" "Invalid du output for path: $path (output: $du_output)"
-        echo "0.00"
-        return 0
-    fi
-
-    # Convert to GB with error handling
-    local size_gb
-    size_gb=$(awk "BEGIN {printf \"%.2f\", $size_bytes/1024/1024/1024}" 2>/dev/null)
-    if [[ $? -ne 0 || -z "$size_gb" ]]; then
-        log "DEBUG" "awk conversion failed for bytes: $size_bytes"
-        echo "0.00"
-    else
-        echo "$size_gb"
-    fi
+    # Fall back to direct calculation for non-model paths
+    get_size_gb_direct "$path"
 }
 
 get_size_mb() {
@@ -157,11 +144,181 @@ get_size_mb() {
 
 count_files() {
     local path="$1"
-    if [[ -d "$path" ]]; then
-        find "$path" -type f 2>/dev/null | wc -l
-    else
+    local exclude_models="${2:-1}"  # Default: exclude models
+
+    if [[ ! -d "$path" ]]; then
         echo "0"
+        return 0
     fi
+
+    # Build find command with exclusions
+    local find_cmd="find \"$path\" -type f"
+
+    # Add model directory exclusions unless specifically requested to include them
+    if [[ "$exclude_models" == "1" && "$CLEANUP_SCAN_MODELS" != "1" ]]; then
+        local exclude_pattern=$(build_model_exclude_pattern)
+        if [[ -n "$exclude_pattern" ]]; then
+            find_cmd="find \"$path\" \\( $exclude_pattern \\) -prune -o -type f -print"
+        fi
+    fi
+
+    # Add mount boundary restriction unless explicitly allowed
+    if [[ "$CLEANUP_ALLOW_MOUNTS" != "1" ]]; then
+        find_cmd="$find_cmd -xdev"
+    fi
+
+    # Execute and count
+    eval "$find_cmd" 2>/dev/null | wc -l
+}
+
+# Model cache management
+is_model_cache_valid() {
+    local cache_file="$IEC_MODEL_CACHE"
+    local invalidate_file="$IEC_MODEL_CACHE_INVALIDATE"
+
+    # Check if cache file exists
+    [[ -f "$cache_file" ]] || return 1
+
+    # Check manual invalidation trigger
+    if [[ -f "$invalidate_file" && "$invalidate_file" -nt "$cache_file" ]]; then
+        log "DEBUG" "Model cache manually invalidated"
+        return 1
+    fi
+
+    # Check directory modification times
+    local model_dirs_array
+    read -ra model_dirs_array <<< "$MODEL_DIRS_SKIP"
+    for model_dir in "${model_dirs_array[@]}"; do
+        if [[ -d "$model_dir" && "$model_dir" -nt "$cache_file" ]]; then
+            log "DEBUG" "Model directory modified: $model_dir"
+            return 1
+        fi
+    done
+
+    # Check TTL
+    local cache_age=$(($(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || echo "0")))
+    if [[ $cache_age -gt $MODEL_CACHE_TTL_SEC ]]; then
+        log "DEBUG" "Model cache expired (age: ${cache_age}s, TTL: ${MODEL_CACHE_TTL_SEC}s)"
+        return 1
+    fi
+
+    log "DEBUG" "Model cache is valid (age: ${cache_age}s)"
+    return 0
+}
+
+get_cached_model_size() {
+    local cache_file="$IEC_MODEL_CACHE"
+
+    if is_model_cache_valid; then
+        cat "$cache_file" 2>/dev/null || echo "0.00"
+    else
+        # Cache invalid, recalculate
+        calculate_model_sizes
+    fi
+}
+
+calculate_model_sizes() {
+    local cache_file="$IEC_MODEL_CACHE"
+    local total_gb="0.00"
+
+    log "DEBUG" "Calculating model directory sizes..."
+
+    # Ensure cache directory exists
+    mkdir -p "$(dirname "$cache_file")"
+
+    local model_dirs_array
+    read -ra model_dirs_array <<< "$MODEL_DIRS_SKIP"
+
+    for model_dir in "${model_dirs_array[@]}"; do
+        if [[ -d "$model_dir" ]]; then
+            local dir_size_gb=$(get_size_gb_direct "$model_dir")
+            log "DEBUG" "Model directory $model_dir: ${dir_size_gb}GB"
+            total_gb=$(awk "BEGIN {printf \"%.2f\", $total_gb + $dir_size_gb}")
+        fi
+    done
+
+    # Cache the result
+    echo "$total_gb" > "$cache_file"
+
+    # Clean up invalidation trigger
+    rm -f "$IEC_MODEL_CACHE_INVALIDATE" 2>/dev/null || true
+
+    log "DEBUG" "Model cache updated: ${total_gb}GB"
+    echo "$total_gb"
+}
+
+# Direct size calculation without cache (for cache population)
+get_size_gb_direct() {
+    local path="$1"
+    if [[ ! -e "$path" ]]; then
+        echo "0.00"
+        return 0
+    fi
+
+    local du_output
+    du_output=$(du -sb "$path" 2>/dev/null)
+    local du_exit=$?
+
+    if [[ $du_exit -ne 0 || -z "$du_output" ]]; then
+        echo "0.00"
+        return 0
+    fi
+
+    local size_bytes=$(echo "$du_output" | awk '{print $1}')
+    if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
+        echo "0.00"
+        return 0
+    fi
+
+    awk "BEGIN {printf \"%.2f\", $size_bytes/1024/1024/1024}" 2>/dev/null || echo "0.00"
+}
+
+# Model directory utilities
+is_model_directory() {
+    local path="$1"
+    local resolved_path
+
+    # Resolve path
+    if [[ -L "$path" ]]; then
+        resolved_path=$(readlink -f "$path" 2>/dev/null)
+    else
+        resolved_path="$path"
+    fi
+
+    # Check against model directories
+    local model_dirs_array
+    read -ra model_dirs_array <<< "$MODEL_DIRS_SKIP"
+    for model_dir in "${model_dirs_array[@]}"; do
+        local resolved_model_dir=$(readlink -f "$model_dir" 2>/dev/null || echo "$model_dir")
+        if [[ "$resolved_path" == "$resolved_model_dir"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+build_model_exclude_pattern() {
+    local pattern=""
+    local model_dirs_array
+    read -ra model_dirs_array <<< "$MODEL_DIRS_SKIP"
+
+    for model_dir in "${model_dirs_array[@]}"; do
+        if [[ -d "$model_dir" ]]; then
+            if [[ -n "$pattern" ]]; then
+                pattern="$pattern -o -path $model_dir/*"
+            else
+                pattern="-path $model_dir/*"
+            fi
+        fi
+    done
+
+    echo "$pattern"
+}
+
+# Invalidate model cache (for external use)
+invalidate_model_cache() {
+    log "INFO" "Invalidating model cache"
+    touch "$IEC_MODEL_CACHE_INVALIDATE" 2>/dev/null || true
 }
 
 # Path validation and safety
@@ -577,6 +734,12 @@ safe_delete() {
     local path="$1"
     local mode="${2:-basic}"
     local dry_run="${3:-$IEC_DRY_RUN}"
+
+    # Short-circuit for model directories unless nuclear mode with explicit delete enabled
+    if is_model_directory "$path" && [[ "$mode" != "nuclear" || "$CLEANUP_DELETE_MODELS" != "1" ]]; then
+        log "DEBUG" "Skipping model directory: $path (mode: $mode, delete_models: ${CLEANUP_DELETE_MODELS:-0})"
+        return 0
+    fi
 
     # Validate path
     if ! validate_cleanup_path "$path"; then

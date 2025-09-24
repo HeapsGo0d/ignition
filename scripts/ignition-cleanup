@@ -193,6 +193,24 @@ discover_writable_locations() {
     echo "6. Consider pinning important files found in discovery"
     echo ""
 
+    echo "## Model Directory Summary"
+    local model_size_gb=$(get_cached_model_size)
+    if [[ $(awk "BEGIN {print ($model_size_gb > 0)}") == "1" ]]; then
+        echo "  📦 Total model size: ${model_size_gb}GB (cached)"
+        local model_dirs_array
+        read -ra model_dirs_array <<< "$MODEL_DIRS_SKIP"
+        for model_dir in "${model_dirs_array[@]}"; do
+            if [[ -d "$model_dir" ]]; then
+                local dir_size_gb=$(get_size_gb_direct "$model_dir")
+                echo "  📦 $model_dir: ${dir_size_gb}GB"
+            fi
+        done
+        echo "  ℹ️  Models excluded from cleanup scans (configure with MODEL_DIRS_SKIP)"
+    else
+        echo "  📦 No model directories detected"
+    fi
+    echo ""
+
     log "INFO" "✅ Discovery complete - review output for missing cleanup targets (depth=$max_depth, threshold=${size_threshold_mb}MB)"
 }
 
@@ -209,11 +227,38 @@ calculate_initial_sizes() {
             total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE")}")
             ;;
         nuclear)
-            total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE") + $(get_size_gb "$IEC_MODELS")}")
+            if [[ "$CLEANUP_DELETE_MODELS" == "1" ]]; then
+                # Include models in nuclear calculation only when explicitly enabled
+                total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE") + $(get_cached_model_size)}")
+            else
+                # Standard nuclear without models
+                total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE")}")
+            fi
             ;;
     esac
 
     echo "$total_gb"
+}
+
+# Report model sizes separately
+show_model_size_summary() {
+    local mode="$1"
+    local model_size_gb=$(get_cached_model_size)
+
+    if [[ $(awk "BEGIN {print ($model_size_gb > 0)}") == "1" ]]; then
+        case "$mode" in
+            basic|enhanced)
+                echo "  📦 Models (excluded from scan): ${model_size_gb}GB (cached)"
+                ;;
+            nuclear)
+                if [[ "$CLEANUP_DELETE_MODELS" == "1" ]]; then
+                    echo "  📦 Models (will be deleted): ${model_size_gb}GB (cached)"
+                else
+                    echo "  📦 Models (protected): ${model_size_gb}GB (cached)"
+                fi
+                ;;
+        esac
+    fi
 }
 
 # Count pinned items
@@ -394,6 +439,7 @@ run_cleanup() {
     CLEANUP_PINNED_COUNT=$(count_pinned_items "$mode")
 
     log "INFO" "Starting cleanup: mode=$mode, initial_size=${initial_gb}GB, pins=$CLEANUP_PINNED_COUNT"
+    show_model_size_summary "$mode"
 
     # Quiesce services if not dry run
     if [[ "$IEC_DRY_RUN" != "1" ]]; then
@@ -432,7 +478,19 @@ run_cleanup() {
         TIMEOUT_PID=""
     fi
 
-    log "INFO" "Cleanup complete"
+    # Final summary
+    echo ""
+    echo "🧹 Cleanup Summary:"
+    echo "  • Mode: $mode"
+    echo "  • Before: ${initial_gb}GB"
+    echo "  • After: ${final_gb}GB"
+    echo "  • Freed: ${CLEANUP_FREED_GB}GB"
+    if [[ "$CLEANUP_PINNED_COUNT" -gt 0 ]]; then
+        echo "  • Pinned items protected: $CLEANUP_PINNED_COUNT"
+    fi
+    show_model_size_summary "$mode"
+
+    log "INFO" "Cleanup complete: freed ${CLEANUP_FREED_GB}GB"
 }
 
 # Parse command line arguments

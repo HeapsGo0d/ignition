@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v2.2.2-enhanced-privacy",
+  "name": "Ignition ComfyUI v1.1.0-iec-phase2",
   "description": "Dynamic ComfyUI with runtime model downloads, minimal privacy system with Big Red Switch, and clean architecture",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v2.2.2-enhanced-privacy",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v1.1.0-iec-phase2",
   "ports": [
     {
       "privatePort": 8188,
@@ -100,8 +100,18 @@
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "IEC_MODE_ON_EXIT",
+      "value": "basic",
+      "description": "IEC cleanup mode on container exit (off|basic|enhanced|nuclear)"
+    },
+    {
+      "key": "IEC_TIMEOUT_SEC",
+      "value": "30",
+      "description": "IEC cleanup timeout in seconds"
     }
   ],
   "startScript": "bash /workspace/scripts/startup-clean.sh"
