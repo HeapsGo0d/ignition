@@ -418,13 +418,19 @@ run_cleanup() {
         exit 1
     fi
 
-    # Set up timeout
+    # Set up timeout - respect user's IEC_TIMEOUT_SEC or use mode-specific defaults
     local timeout_sec="$IEC_TIMEOUT_SEC"
-    case "$mode" in
-        basic) timeout_sec=5 ;;
-        enhanced) timeout_sec=10 ;;
-        nuclear) timeout_sec=30 ;;
-    esac
+
+    # Only use mode-specific defaults if user hasn't explicitly set a custom timeout
+    if [[ -z "$CUSTOM_TIMEOUT" && "$IEC_TIMEOUT_SEC" == "30" ]]; then
+        # User is using default timeout, apply mode-specific timeouts for efficiency
+        case "$mode" in
+            basic) timeout_sec=5 ;;
+            enhanced) timeout_sec=10 ;;
+            nuclear) timeout_sec=30 ;;
+        esac
+    fi
+    # Otherwise, user's explicit timeout takes precedence
 
     if [[ "${IEC_TIMEOUT_SEC:-30}" -gt 0 ]]; then
         TIMEOUT_PID=$(setup_timeout "$timeout_sec")
