@@ -1,0 +1,443 @@
+#!/bin/bash
+# Intelligent Ephemeral Cleanup (IEC) - Main Executable
+# Predictable, fast, and safe container cleanup with tiered modes
+
+set -euo pipefail
+
+# Source helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/cleanup-helpers.sh" ]]; then
+    source "$SCRIPT_DIR/cleanup-helpers.sh"
+else
+    echo "ERROR: cleanup-helpers.sh not found in $SCRIPT_DIR"
+    exit 1
+fi
+
+# Global state
+CLEANUP_START_TIME=0
+CLEANUP_FREED_GB="0.00"
+CLEANUP_PINNED_COUNT=0
+TIMEOUT_PID=""
+
+# Cleanup function for signals
+cleanup_handler() {
+    local exit_code=${1:-0}
+
+    # Stop timeout if running
+    if [[ -n "$TIMEOUT_PID" ]]; then
+        kill "$TIMEOUT_PID" 2>/dev/null || true
+    fi
+
+    # Calculate duration
+    local duration=0
+    if [[ $CLEANUP_START_TIME -gt 0 ]]; then
+        duration=$(($(date +%s) - CLEANUP_START_TIME))
+    fi
+
+    # Generate report if cleanup was started
+    if [[ $CLEANUP_START_TIME -gt 0 ]]; then
+        generate_cleanup_report "${MODE:-unknown}" "$CLEANUP_FREED_GB" "$CLEANUP_PINNED_COUNT" "$duration" "$IEC_DRY_RUN"
+    fi
+
+    # Always release lock
+    release_cleanup_lock
+
+    exit $exit_code
+}
+
+trap 'cleanup_handler $?' EXIT
+trap 'cleanup_handler 130' INT
+trap 'cleanup_handler 143' TERM
+
+# Print usage
+usage() {
+    cat << EOF
+Usage: ignition-cleanup [MODE] [OPTIONS]
+
+MODES:
+    basic        Delete outputs, uploads, temp, session logs (≤5s)
+    enhanced     Basic + caches, thumbnails, non-critical state (≤10s)
+    nuclear      Enhanced + models, all state - REQUIRES CONFIRMATION (≤30s)
+    dry-run      Show what would be deleted without making changes
+    discover     Find unknown writable locations for testing/audit
+
+OPTIONS:
+    --yes        Skip confirmation prompts (required for nuclear mode)
+    --force      Ignore pins and safety checks (DANGEROUS)
+    --timeout=N  Override timeout in seconds
+    --help, -h   Show this help
+
+ENVIRONMENT:
+    IEC_MODE_ON_EXIT      Default mode for exit cleanup (basic)
+    IEC_TIMEOUT_SEC       Default timeout in seconds (30)
+    IEC_DRY_RUN           Run in dry-run mode (0/1)
+    CLEANUP_IGNORE_PINS   Ignore pin protections (0/1)
+
+EXAMPLES:
+    ignition-cleanup basic
+    ignition-cleanup dry-run
+    ignition-cleanup nuclear --yes
+    ignition-cleanup discover > writable-locations.txt
+
+Pin files are loaded from: $IEC_PINS_FILE
+EOF
+}
+
+# Discovery mode to find unknown writable locations
+discover_writable_locations() {
+    log "INFO" "🔍 Discovering writable locations (for testing/audit)..."
+
+    echo "# Writable Location Discovery Report"
+    echo "# Generated: $(date)"
+    echo "# Purpose: Find locations that need cleanup coverage"
+    echo ""
+
+    echo "## Recently Modified Files (last 60 minutes)"
+    find /workspace -type f -mmin -60 -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
+        head -50 | while read -r file; do
+        echo "  $file ($(stat -c %y "$file" 2>/dev/null || echo "unknown date"))"
+    done
+    echo ""
+
+    echo "## Directories with Recent Activity"
+    find /workspace -type d -mmin -60 -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
+        head -20 | while read -r dir; do
+        local count=$(find "$dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
+        local size=$(get_size_mb "$dir")
+        echo "  $dir ($count files, ${size}MB)"
+    done
+    echo ""
+
+    echo "## Large Directories (>10MB)"
+    find /workspace -type d -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
+        head -50 | while read -r dir; do
+        local size_mb=$(get_size_mb "$dir")
+        # Use awk instead of bc for better portability
+        if awk "BEGIN {exit !($size_mb > 10.0)}"; then
+            echo "  $dir (${size_mb}MB)"
+        fi
+    done | head -20
+    echo ""
+
+    echo "## Cache and Temporary Directories"
+    find /workspace -type d -name "*cache*" -o -name "*tmp*" -o -name "*temp*" 2>/dev/null | \
+        while read -r dir; do
+        local size_mb=$(get_size_mb "$dir")
+        echo "  $dir (${size_mb}MB)"
+    done
+    echo ""
+
+    echo "## Database and State Files"
+    find /workspace -name "*.db" -o -name "*.sqlite" -o -name "*.json" -o -name "*.log" 2>/dev/null | \
+        head -20 | while read -r file; do
+        local size_mb=$(get_size_mb "$file")
+        echo "  $file (${size_mb}MB)"
+    done
+    echo ""
+
+    echo "## ComfyUI Output Patterns"
+    find /workspace -name "ComfyUI_*.png" -o -name "*.txt" -path "*/output*" 2>/dev/null | \
+        head -10 | while read -r file; do
+        echo "  $file"
+    done
+    echo ""
+
+    echo "## Process-Specific Directories"
+    if command -v lsof >/dev/null; then
+        echo "### Files currently open by processes"
+        lsof 2>/dev/null | grep "/workspace" | awk '{print $9}' | sort -u | head -10 | \
+            while read -r file; do
+            echo "  $file"
+        done
+    fi
+    echo ""
+
+    echo "## Recommended Actions"
+    echo "1. Review Recent Activity section for active write locations"
+    echo "2. Check if Large Directories should be in cleanup paths"
+    echo "3. Ensure Cache/Temp directories are covered by IEC_DATA_CACHE"
+    echo "4. Verify Database files are under IEC_DATA_STATE"
+    echo "5. Confirm output patterns match IEC_DATA_OUTPUTS"
+    echo ""
+
+    log "INFO" "✅ Discovery complete - review output for missing cleanup targets"
+}
+
+# Calculate size before cleanup
+calculate_initial_sizes() {
+    local mode="$1"
+
+    local total_gb=0
+    case "$mode" in
+        basic)
+            total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP")}")
+            ;;
+        enhanced)
+            total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE")}")
+            ;;
+        nuclear)
+            total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE") + $(get_size_gb "$IEC_MODELS")}")
+            ;;
+    esac
+
+    echo "$total_gb"
+}
+
+# Count pinned items
+count_pinned_items() {
+    local mode="$1"
+    local count=0
+
+    local paths=()
+    case "$mode" in
+        basic)
+            paths=("$IEC_DATA_OUTPUTS" "$IEC_DATA_UPLOADS" "$IEC_TMP")
+            ;;
+        enhanced)
+            paths=("$IEC_DATA_OUTPUTS" "$IEC_DATA_UPLOADS" "$IEC_TMP" "$IEC_DATA_CACHE")
+            ;;
+        nuclear)
+            paths=("$IEC_DATA_OUTPUTS" "$IEC_DATA_UPLOADS" "$IEC_TMP" "$IEC_DATA_CACHE" "$IEC_DATA_STATE" "$IEC_MODELS")
+            ;;
+    esac
+
+    for path in "${paths[@]}"; do
+        if [[ -e "$path" ]] && is_pinned "$path"; then
+            ((count++))
+        fi
+    done
+
+    echo "$count"
+}
+
+# Basic cleanup mode
+cleanup_basic() {
+    log "INFO" "🧹 Basic cleanup: outputs, uploads, temp, session logs"
+
+    # P0: Must remove (privacy-critical)
+    safe_delete "$IEC_DATA_OUTPUTS" basic
+    safe_delete "$IEC_DATA_UPLOADS" basic
+    safe_delete "$IEC_TMP" basic
+
+    # Session and recent logs (rotate, don't delete all)
+    if [[ -d "$IEC_DATA_LOGS" ]]; then
+        # Keep cleanup log and privacy system logs, remove session artifacts
+        find "$IEC_DATA_LOGS" -name "session*" -mtime +0 -type f -exec rm -f {} + 2>/dev/null || true
+        find "$IEC_DATA_LOGS" -name "startup*" -mtime +0 -type f -exec rm -f {} + 2>/dev/null || true
+    fi
+
+    # Remove temporary startup logs
+    rm -f /tmp/ignition_startup.log /tmp/*.tmp 2>/dev/null || true
+
+    log "INFO" "✅ Basic cleanup complete"
+}
+
+# Enhanced cleanup mode
+cleanup_enhanced() {
+    log "INFO" "🧹 Enhanced cleanup: basic + caches, thumbnails, non-critical state"
+
+    # Run basic cleanup first
+    cleanup_basic
+
+    # P1: Nice to remove (performance)
+    safe_delete "$IEC_DATA_CACHE" enhanced
+
+    # Remove thumbnail and preview caches if they exist
+    find /workspace -name "*thumb*" -o -name "*preview*" -o -name "*cache*" -type d 2>/dev/null | \
+        while read -r cache_dir; do
+        if [[ "$cache_dir" != "$IEC_DATA_CACHE"* ]]; then  # Don't double-delete
+            safe_delete "$cache_dir" enhanced
+        fi
+    done
+
+    # Clean pip caches and build artifacts
+    rm -rf /tmp/pip-* /root/.cache/pip ~/.cache/pip 2>/dev/null || true
+
+    log "INFO" "✅ Enhanced cleanup complete"
+}
+
+# Nuclear cleanup mode
+cleanup_nuclear() {
+    local confirmed="$1"
+
+    if [[ "$confirmed" != "yes" ]]; then
+        echo -e "${RED}⚠️  NUCLEAR MODE WARNING ⚠️${NC}"
+        echo ""
+        echo "Nuclear mode will delete:"
+        echo "  • All outputs, uploads, caches, and temporary files"
+        echo "  • All downloaded models (will need to re-download)"
+        echo "  • All application state (databases, configurations, tokens)"
+        echo "  • ComfyUI Manager settings and installed extensions"
+        echo ""
+        echo "This will make the next startup behave like a fresh container boot."
+        echo ""
+        read -p "Are you sure you want to continue? (type 'YES' to confirm): " confirm
+        if [[ "$confirm" != "YES" ]]; then
+            log "INFO" "Nuclear cleanup cancelled"
+            exit 0
+        fi
+    fi
+
+    log "INFO" "☢️  Nuclear cleanup: EVERYTHING (models, state, tokens)"
+
+    # Run enhanced cleanup first
+    cleanup_enhanced
+
+    # P2: Heavy items (nuclear only)
+    safe_delete "$IEC_MODELS" nuclear
+    safe_delete "$IEC_DATA_STATE" nuclear
+
+    # Remove any remaining application state
+    safe_delete "/workspace/.filebrowser" nuclear
+    safe_delete "/workspace/ComfyUI/models" nuclear  # Legacy location
+
+    # Clear tokens and credentials (be careful not to log them)
+    find /workspace -name "*token*" -o -name "*key*" -o -name "*secret*" 2>/dev/null | \
+        grep -v cleanup | head -10 | while read -r file; do
+        if [[ -f "$file" ]]; then
+            log "INFO" "Removing credential file: $(basename "$file")"
+            rm -f "$file" 2>/dev/null || true
+        fi
+    done
+
+    log "INFO" "✅ Nuclear cleanup complete - next start will be like fresh boot"
+}
+
+# Main cleanup execution
+run_cleanup() {
+    local mode="$1"
+    local force_confirm="${2:-no}"
+
+    # Acquire lock
+    if ! acquire_cleanup_lock; then
+        log "ERROR" "Another cleanup is running"
+        exit 1
+    fi
+
+    # Set up timeout
+    local timeout_sec="$IEC_TIMEOUT_SEC"
+    case "$mode" in
+        basic) timeout_sec=5 ;;
+        enhanced) timeout_sec=10 ;;
+        nuclear) timeout_sec=30 ;;
+    esac
+
+    if [[ "${IEC_TIMEOUT_SEC:-30}" -gt 0 ]]; then
+        TIMEOUT_PID=$(setup_timeout "$timeout_sec")
+        log "DEBUG" "Timeout set: ${timeout_sec}s (PID: $TIMEOUT_PID)"
+    fi
+
+    # Record start time
+    CLEANUP_START_TIME=$(date +%s)
+
+    # Calculate initial sizes
+    local initial_gb=$(calculate_initial_sizes "$mode")
+    CLEANUP_PINNED_COUNT=$(count_pinned_items "$mode")
+
+    log "INFO" "Starting cleanup: mode=$mode, initial_size=${initial_gb}GB, pins=$CLEANUP_PINNED_COUNT"
+
+    # Quiesce services if not dry run
+    if [[ "$IEC_DRY_RUN" != "1" ]]; then
+        quiesce_services
+    fi
+
+    # Run cleanup based on mode
+    case "$mode" in
+        basic)
+            cleanup_basic
+            ;;
+        enhanced)
+            cleanup_enhanced
+            ;;
+        nuclear)
+            cleanup_nuclear "$force_confirm"
+            ;;
+        *)
+            log "ERROR" "Unknown cleanup mode: $mode"
+            exit 1
+            ;;
+    esac
+
+    # Recreate directory skeleton if not dry run
+    if [[ "$IEC_DRY_RUN" != "1" ]]; then
+        recreate_skeleton
+    fi
+
+    # Calculate freed space
+    local final_gb=$(calculate_initial_sizes "$mode")
+    CLEANUP_FREED_GB=$(awk "BEGIN {printf \"%.2f\", $initial_gb - $final_gb}")
+
+    # Stop timeout
+    if [[ -n "$TIMEOUT_PID" ]]; then
+        kill "$TIMEOUT_PID" 2>/dev/null || true
+        TIMEOUT_PID=""
+    fi
+
+    log "INFO" "Cleanup complete"
+}
+
+# Parse command line arguments
+MODE=""
+FORCE_CONFIRM="no"
+CUSTOM_TIMEOUT=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        basic|enhanced|nuclear|dry-run|discover)
+            MODE="$1"
+            ;;
+        --yes)
+            FORCE_CONFIRM="yes"
+            ;;
+        --force)
+            export CLEANUP_IGNORE_PINS=1
+            ;;
+        --timeout=*)
+            CUSTOM_TIMEOUT="${1#--timeout=}"
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Set custom timeout if provided
+if [[ -n "$CUSTOM_TIMEOUT" ]]; then
+    export IEC_TIMEOUT_SEC="$CUSTOM_TIMEOUT"
+fi
+
+# Default to basic mode if none specified
+if [[ -z "$MODE" ]]; then
+    MODE="basic"
+fi
+
+# Handle dry-run mode
+if [[ "$MODE" == "dry-run" ]]; then
+    export IEC_DRY_RUN=1
+    MODE="enhanced"  # Show what enhanced would do
+fi
+
+# Print banner
+print_iec_banner "$MODE" "cleanup"
+
+# Special handling for discover mode
+if [[ "$MODE" == "discover" ]]; then
+    discover_writable_locations
+    exit 0
+fi
+
+# Validate nuclear mode requires confirmation
+if [[ "$MODE" == "nuclear" && "$FORCE_CONFIRM" != "yes" && "${NUKE:-}" != "YES" ]]; then
+    # Interactive confirmation will be handled in cleanup_nuclear
+    :
+fi
+
+# Run cleanup
+run_cleanup "$MODE" "$FORCE_CONFIRM"

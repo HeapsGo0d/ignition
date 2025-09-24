@@ -1,0 +1,56 @@
+# IEC Pin Configuration Example
+# Copy to /workspace/policy/pins.txt to protect specific files/models from cleanup
+#
+# Pin types:
+#   model:name     - Protect models containing 'name' in path
+#   folder:path    - Protect entire folder and contents
+#   /absolute/path - Protect specific absolute path
+#   *.pattern      - Protect files matching glob pattern
+#
+# Lines starting with # are comments and ignored
+
+# Example: Pin specific models (keeps models even in Nuclear mode)
+# model:flux1-dev
+# model:stable-diffusion-xl
+# model:llama-2-7b
+
+# Example: Pin important folders
+# folder:/workspace/models/core
+# folder:/workspace/data/state/important-configs
+
+# Example: Pin specific files
+# /workspace/data/state/filebrowser/critical-settings.json
+# /workspace/models/custom-trained-model.safetensors
+
+# Example: Pin patterns (use carefully)
+# *.important
+# /workspace/data/outputs/client-*
+
+# Common pins for production use:
+
+# 1. Core models that are expensive to re-download
+# model:flux1-dev
+# model:clip_l
+# model:t5xxl_fp16
+
+# 2. Important application state
+# folder:/workspace/data/state/filebrowser
+# folder:/workspace/data/state/comfyui-manager
+
+# 3. Custom trained models
+# /workspace/models/custom/*
+
+# 4. Critical configuration files
+# /workspace/privacy/allowlist.txt
+# /workspace/policy/pins.txt
+
+# NOTES:
+# - Pins are respected in all cleanup modes unless CLEANUP_IGNORE_PINS=1
+# - Nuclear mode with --force will ignore pins (dangerous)
+# - Use 'ignition-cleanup discover' to find paths that might need pinning
+# - Pin the minimum necessary - over-pinning reduces cleanup effectiveness
+
+# Test your pins with:
+# ignition-cleanup dry-run    # Shows what would be deleted
+# ignition-cleanup basic      # Test basic cleanup
+# ignition-cleanup enhanced   # Test enhanced cleanup

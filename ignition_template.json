@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v2.1.1",
-  "description": "Dynamic ComfyUI with runtime model downloads, modular privacy protection, and clean architecture",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v2.1.1",
+  "name": "Ignition ComfyUI v2.2.2-enhanced-privacy",
+  "description": "Dynamic ComfyUI with runtime model downloads, minimal privacy system with Big Red Switch, and clean architecture",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v2.2.2-enhanced-privacy",
   "ports": [
     {
       "privatePort": 8188,
@@ -71,17 +71,27 @@
     {
       "key": "PRIVACY_ENABLED",
       "value": "true",
-      "description": "Enable network privacy protection (true/false)"
+      "description": "Enable minimal privacy system (true/false)"
     },
     {
-      "key": "MONITORING_ONLY",
-      "value": "false",
-      "description": "Monitoring only mode - log but don't block (true/false)"
+      "key": "STRICT_MODE",
+      "value": "0",
+      "description": "Enable strict mode deny-by-default networking (0/1)"
     },
     {
-      "key": "BLOCK_TELEMETRY",
-      "value": "true",
-      "description": "Block telemetry domains (true/false)"
+      "key": "PRIVACY_BYPASS",
+      "value": "0",
+      "description": "Break-glass privacy bypass - DANGER (0/1)"
+    },
+    {
+      "key": "PRIV_ALLOW_UPDATES",
+      "value": "0",
+      "description": "Enable updates window for GitHub/PyPI (0/1)"
+    },
+    {
+      "key": "PROXY_PORT",
+      "value": "8888",
+      "description": "Minimal proxy port"
     },
     {
       "key": "COMFYUI_PORT",

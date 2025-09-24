@@ -194,6 +194,26 @@ get_configuration() {
     fi
     echo ""
 
+    # IEC Cleanup settings
+    echo -e "${BLUE}IEC Cleanup Settings:${NC}"
+    read -p "Default cleanup mode on container exit [basic]: " input_cleanup_mode
+    IEC_MODE_ON_EXIT=${input_cleanup_mode:-basic}
+
+    # Validate cleanup mode
+    case "$IEC_MODE_ON_EXIT" in
+        off|basic|enhanced|nuclear) ;;
+        *) IEC_MODE_ON_EXIT="basic" ;;
+    esac
+
+    read -p "Cleanup timeout in seconds [30]: " input_timeout
+    IEC_TIMEOUT_SEC=${input_timeout:-30}
+
+    echo "  → Cleanup on exit: $IEC_MODE_ON_EXIT (${IEC_TIMEOUT_SEC}s timeout)"
+    if [[ "$IEC_MODE_ON_EXIT" == "nuclear" ]]; then
+        echo "  → ⚠️  Nuclear mode will delete ALL models and state on exit"
+    fi
+    echo ""
+
     # Note about storage
     echo -e "${BLUE}Storage Note:${NC}"
     echo "Persistence handled by RunPod volume settings:"
@@ -315,8 +335,18 @@ generate_template() {
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "IEC_MODE_ON_EXIT",
+      "value": "$IEC_MODE_ON_EXIT",
+      "description": "IEC cleanup mode on container exit (off|basic|enhanced|nuclear)"
+    },
+    {
+      "key": "IEC_TIMEOUT_SEC",
+      "value": "$IEC_TIMEOUT_SEC",
+      "description": "IEC cleanup timeout in seconds"
     }
   ],$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo '
   "securityContext": {
@@ -360,6 +390,17 @@ print_summary() {
     echo "  • Updates Window: ${PRIV_ALLOW_UPDATES}"
     if [[ "$STRICT_MODE" == "1" ]]; then
         echo "  • Capabilities: $([[ "$REQUEST_NET_ADMIN" == "true" ]] && echo "NET_ADMIN requested (iptables enforcement)" || echo "No capabilities (monitoring-only)")"
+    fi
+    echo ""
+    echo -e "${BLUE}IEC Cleanup Configuration:${NC}"
+    echo "  • Cleanup on Exit: ${IEC_MODE_ON_EXIT}"
+    echo "  • Timeout: ${IEC_TIMEOUT_SEC}s"
+    if [[ "$IEC_MODE_ON_EXIT" == "nuclear" ]]; then
+        echo "  • ⚠️  Nuclear mode will delete models and state on exit"
+    elif [[ "$IEC_MODE_ON_EXIT" == "enhanced" ]]; then
+        echo "  • Enhanced mode clears caches but keeps models"
+    elif [[ "$IEC_MODE_ON_EXIT" == "basic" ]]; then
+        echo "  • Basic mode clears outputs/uploads but keeps models/caches"
     fi
     echo ""
     echo -e "${BLUE}Access:${NC}"
@@ -533,7 +574,9 @@ deploy_template() {
     {"key": "STRICT_MODE", "value": "$STRICT_MODE"},
     {"key": "PRIVACY_BYPASS", "value": "0"},
     {"key": "PRIV_ALLOW_UPDATES", "value": "$PRIV_ALLOW_UPDATES"},
-    {"key": "PROXY_PORT", "value": "8888"}
+    {"key": "PROXY_PORT", "value": "8888"},
+    {"key": "IEC_MODE_ON_EXIT", "value": "$IEC_MODE_ON_EXIT"},
+    {"key": "IEC_TIMEOUT_SEC", "value": "$IEC_TIMEOUT_SEC"}
   ]$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo ',
   "securityContext": {
     "capabilities": {

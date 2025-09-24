@@ -10,11 +10,22 @@ WORKSPACE_ROOT="/workspace"
 COMFYUI_ROOT="/workspace/ComfyUI"
 LOG_FILE="/tmp/ignition_startup.log"
 
-# Set up caches and paths
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
-export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
+# Set up caches and paths (centralized for IEC cleanup)
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/data/cache}"
+export HF_HOME="${HF_HOME:-/workspace/data/cache/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME}"
-mkdir -p "$HF_HOME" || true
+export TMPDIR="${TMPDIR:-/workspace/tmp}"
+
+# Create centralized directories
+mkdir -p "$HF_HOME" "$XDG_CACHE_HOME" "$TMPDIR" /workspace/data/{outputs,uploads,logs,state} /workspace/models /workspace/policy || true
+
+# Source IEC helpers if available
+if [[ -f "$SCRIPT_DIR/cleanup-helpers.sh" ]]; then
+    source "$SCRIPT_DIR/cleanup-helpers.sh"
+    IEC_AVAILABLE=true
+else
+    IEC_AVAILABLE=false
+fi
 
 # Add scripts to PATH
 export PATH="/workspace/scripts:$PATH"
@@ -64,6 +75,10 @@ export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
 export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
+
+# IEC environment defaults
+export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
+export IEC_TIMEOUT_SEC="${IEC_TIMEOUT_SEC:-30}"
 
 print_banner() {
     log "INFO" ""
@@ -264,7 +279,8 @@ download_models() {
 start_filebrowser() {
     log "INFO" "📁 Starting file browser..."
 
-    local config_dir="$WORKSPACE_ROOT/.filebrowser"
+    # Use centralized state directory for IEC cleanup
+    local config_dir="/workspace/data/state/filebrowser"
     local db_path="$config_dir/filebrowser.db"
     mkdir -p "$config_dir"
 
@@ -351,10 +367,31 @@ start_comfyui() {
     exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
 }
 
-# Signal handlers
+# Signal handlers with IEC cleanup integration
 cleanup() {
     log "INFO" "🛑 Shutting down Ignition..."
+
+    # Stop all background jobs
     jobs -p | xargs -r kill 2>/dev/null || true
+
+    # Run IEC cleanup on exit if enabled
+    if [[ "$IEC_AVAILABLE" == "true" && "$IEC_MODE_ON_EXIT" != "off" ]]; then
+        log "INFO" "🧹 Running IEC cleanup mode: $IEC_MODE_ON_EXIT"
+
+        # Run cleanup in background to avoid hanging the shutdown
+        timeout 10s ignition-cleanup "$IEC_MODE_ON_EXIT" 2>/dev/null || {
+            log "WARN" "IEC cleanup timed out or failed during shutdown"
+        } &
+
+        # Wait briefly for cleanup to start, then continue shutdown
+        sleep 1
+    fi
+
+    # Mark session end for crash detection
+    if [[ "$IEC_AVAILABLE" == "true" ]]; then
+        mark_session_end
+    fi
+
     exit 0
 }
 
@@ -362,6 +399,19 @@ trap cleanup SIGTERM SIGINT
 
 # Main execution
 main() {
+    # Mark session start for crash detection
+    if [[ "$IEC_AVAILABLE" == "true" ]]; then
+        mark_session_start
+
+        # Check for stale session and run deferred cleanup if needed
+        if check_stale_session; then
+            log "INFO" "🧹 Running deferred cleanup from previous session..."
+            timeout 30s ignition-cleanup enhanced 2>/dev/null || {
+                log "WARN" "Deferred cleanup failed, continuing startup"
+            }
+        fi
+    fi
+
     print_banner
     print_config
     check_system
