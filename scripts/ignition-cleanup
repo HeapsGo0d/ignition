@@ -271,8 +271,19 @@ cleanup_nuclear() {
         echo ""
         echo "This will make the next startup behave like a fresh container boot."
         echo ""
-        read -p "Are you sure you want to continue? (type 'YES' to confirm): " confirm
-        if [[ "$confirm" != "YES" ]]; then
+        read -p "Type 'DELETE EVERYTHING' to confirm: " confirm
+        if [[ "$confirm" != "DELETE EVERYTHING" ]]; then
+            log "INFO" "Nuclear cleanup cancelled"
+            exit 0
+        fi
+
+        echo ""
+        echo -e "${YELLOW}⏳ Please wait 5 seconds to think about this...${NC}"
+        sleep 5
+
+        echo ""
+        read -p "Final confirmation - type 'YES DELETE ALL': " final
+        if [[ "$final" != "YES DELETE ALL" ]]; then
             log "INFO" "Nuclear cleanup cancelled"
             exit 0
         fi

@@ -136,12 +136,26 @@ validate_cleanup_path() {
         fi
     done
 
-    # Resolve path safely
+    # Resolve path safely - fail-closed if realpath fails
     local resolved_path
     if [[ -e "$path" ]]; then
-        resolved_path=$(realpath "$path" 2>/dev/null || echo "$path")
+        resolved_path=$(realpath "$path" 2>/dev/null)
+        if [[ -z "$resolved_path" ]]; then
+            log "ERROR" "Failed to resolve path safely: $path"
+            return 1
+        fi
     else
         resolved_path="$path"
+    fi
+
+    # Check for symlinks and validate them
+    if [[ -L "$path" ]]; then
+        log "DEBUG" "Symlink detected: $path -> $resolved_path"
+        # Additional symlink validation - ensure target is also safe
+        if [[ "$resolved_path" != "/workspace"* ]]; then
+            log "ERROR" "Symlink target outside workspace: $path -> $resolved_path"
+            return 1
+        fi
     fi
 
     # Check if under /workspace (unless specifically allowing root paths)
@@ -158,16 +172,29 @@ validate_cleanup_path() {
 load_pins() {
     local pins=()
 
+    # Create parent directory if missing
+    local pins_dir=$(dirname "$IEC_PINS_FILE")
+    if [[ ! -d "$pins_dir" ]]; then
+        mkdir -p "$pins_dir" 2>/dev/null || {
+            log "WARN" "Failed to create pins directory: $pins_dir"
+            return 0  # Return empty list on failure
+        }
+        log "DEBUG" "Created pins directory: $pins_dir"
+    fi
+
     if [[ -f "$IEC_PINS_FILE" ]]; then
         while IFS= read -r line; do
             # Skip comments and empty lines
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "${line// }" ]] && continue
             pins+=("$line")
-        done < "$IEC_PINS_FILE"
+        done < "$IEC_PINS_FILE" 2>/dev/null || {
+            log "WARN" "Failed to read pins file: $IEC_PINS_FILE"
+            return 0  # Return empty list on read failure
+        }
         log "DEBUG" "Loaded ${#pins[@]} pins from $IEC_PINS_FILE"
     else
-        log "DEBUG" "No pins file found at $IEC_PINS_FILE"
+        log "DEBUG" "No pins file found at $IEC_PINS_FILE (this is normal)"
     fi
 
     printf '%s\n' "${pins[@]}"
@@ -177,9 +204,9 @@ is_pinned() {
     local path="$1"
     local pins
 
-    # If ignoring pins, nothing is pinned
+    # If ignoring pins, nothing is pinned (return 1 = false = not pinned)
     if [[ "$CLEANUP_IGNORE_PINS" == "1" ]]; then
-        return 1
+        return 1  # Return 1 = false = not pinned, so deletion proceeds
     fi
 
     # Load pins into array

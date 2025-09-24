@@ -19,14 +19,6 @@ export TMPDIR="${TMPDIR:-/workspace/tmp}"
 # Create centralized directories
 mkdir -p "$HF_HOME" "$XDG_CACHE_HOME" "$TMPDIR" /workspace/data/{outputs,uploads,logs,state} /workspace/models /workspace/policy || true
 
-# Source IEC helpers if available
-if [[ -f "$SCRIPT_DIR/cleanup-helpers.sh" ]]; then
-    source "$SCRIPT_DIR/cleanup-helpers.sh"
-    IEC_AVAILABLE=true
-else
-    IEC_AVAILABLE=false
-fi
-
 # Add scripts to PATH
 export PATH="/workspace/scripts:$PATH"
 
@@ -79,6 +71,15 @@ export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
 # IEC environment defaults
 export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
 export IEC_TIMEOUT_SEC="${IEC_TIMEOUT_SEC:-30}"
+export IEC_EXIT_TIMEOUT_SEC="${IEC_EXIT_TIMEOUT_SEC:-30}"
+
+# Source IEC helpers after environment is set up
+if [[ -f "$SCRIPT_DIR/cleanup-helpers.sh" ]]; then
+    source "$SCRIPT_DIR/cleanup-helpers.sh"
+    IEC_AVAILABLE=true
+else
+    IEC_AVAILABLE=false
+fi
 
 print_banner() {
     log "INFO" ""
@@ -378,9 +379,18 @@ cleanup() {
     if [[ "$IEC_AVAILABLE" == "true" && "$IEC_MODE_ON_EXIT" != "off" ]]; then
         log "INFO" "🧹 Running IEC cleanup mode: $IEC_MODE_ON_EXIT"
 
+        # Scale timeout based on cleanup mode
+        local exit_timeout="$IEC_EXIT_TIMEOUT_SEC"
+        case "$IEC_MODE_ON_EXIT" in
+            basic) exit_timeout=10 ;;
+            enhanced) exit_timeout=20 ;;
+            nuclear) exit_timeout=30 ;;
+            *) exit_timeout="$IEC_EXIT_TIMEOUT_SEC" ;;
+        esac
+
         # Run cleanup in background to avoid hanging the shutdown
-        timeout 10s ignition-cleanup "$IEC_MODE_ON_EXIT" 2>/dev/null || {
-            log "WARN" "IEC cleanup timed out or failed during shutdown"
+        timeout "${exit_timeout}s" ignition-cleanup "$IEC_MODE_ON_EXIT" 2>/dev/null || {
+            log "WARN" "IEC cleanup timed out (${exit_timeout}s) or failed during shutdown"
         } &
 
         # Wait briefly for cleanup to start, then continue shutdown
