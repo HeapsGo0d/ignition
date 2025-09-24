@@ -227,6 +227,8 @@ show_status() {
 case "${1:-status}" in
     "start")
         if [[ "${PRIVACY_BYPASS:-0}" == "1" ]]; then
+            echo "⚠️⚠️⚠️ PRIVACY BYPASS ACTIVE - NO NETWORK PROTECTION ⚠️⚠️⚠️" | tee /dev/stderr
+            echo "⚠️⚠️⚠️ ALL TELEMETRY AND TRACKING ENABLED ⚠️⚠️⚠️" | tee /dev/stderr
             log "WARN" "Privacy bypass active - update window not needed"
             exit 0
         fi

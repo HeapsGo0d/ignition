@@ -320,6 +320,7 @@ class ActivityDetector:
         self.patterns: List[ActivityPattern] = []
         self.health_check = SmartHealthCheck()
         self.active_activities: Dict[int, DetectedActivity] = {}  # pid -> activity
+        self._confidence_cache: Dict[str, Optional[DetectedActivity]] = {}  # cache for repeated calculations
 
         # Initialize process monitor
         try:
@@ -434,6 +435,17 @@ class ActivityDetector:
         if not self.process_monitor:
             return None
 
+        # Cache key based on command signature
+        cache_key = f"{proc_info.command}:{hash(proc_info.full_cmdline)}:{proc_info.cwd}"
+
+        # Check cache first
+        if cache_key in self._confidence_cache:
+            return self._confidence_cache[cache_key]
+
+        # Prevent unbounded cache growth
+        if len(self._confidence_cache) > 1000:
+            self._confidence_cache.clear()
+
         # Get process lineage for context
         lineage = self.process_monitor.get_process_lineage(proc_info.pid)
 
@@ -450,6 +462,8 @@ class ActivityDetector:
                 best_match = pattern.activity_type
 
         if not best_match or best_confidence < 0.1:
+            # Cache the negative result
+            self._confidence_cache[cache_key] = None
             return None
 
         # Apply adaptive thresholds based on system health
@@ -483,7 +497,7 @@ class ActivityDetector:
         if proc_info.uid == 0:
             risk_factors.append('running_as_root')
 
-        return DetectedActivity(
+        result = DetectedActivity(
             activity_type=best_match,
             confidence=adjusted_confidence,
             policy_action=policy_action,
@@ -494,6 +508,10 @@ class ActivityDetector:
             allowed_domains=best_pattern.allowed_domains if best_pattern else [],
             risk_factors=risk_factors
         )
+
+        # Cache the result
+        self._confidence_cache[cache_key] = result
+        return result
 
     def should_allow_connection(self, domain: str, port: int) -> tuple[bool, Optional[str]]:
         """

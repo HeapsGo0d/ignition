@@ -194,6 +194,8 @@ test_connectivity() {
 case "${1:-start}" in
     "start")
         if [[ "${PRIVACY_BYPASS:-0}" == "1" ]]; then
+            echo "⚠️⚠️⚠️ PRIVACY BYPASS ACTIVE - NO NETWORK PROTECTION ⚠️⚠️⚠️" | tee /dev/stderr
+            echo "⚠️⚠️⚠️ ALL TELEMETRY AND TRACKING ENABLED ⚠️⚠️⚠️" | tee /dev/stderr
             log "WARN" "Privacy bypass active - skipping firewall rules"
             exit 0
         fi

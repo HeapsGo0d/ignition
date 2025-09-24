@@ -27,12 +27,8 @@ print(f"  Command: {real_pip_process.command}")
 print(f"  Cmdline: {real_pip_process.cmdline}")
 print(f"  Full cmdline: {getattr(real_pip_process, 'full_cmdline', 'N/A')}")
 
-# Check if process has full_cmdline attribute
-if not hasattr(real_pip_process, 'full_cmdline'):
-    print("❌ ProcessInfo missing full_cmdline attribute!")
-    # Add it manually
-    real_pip_process.full_cmdline = ' '.join(real_pip_process.cmdline)
-    print(f"  Added full_cmdline: {real_pip_process.full_cmdline}")
+# ProcessInfo already has full_cmdline as a property
+print(f"✅ ProcessInfo full_cmdline: {real_pip_process.full_cmdline}")
 
 print("\n🔍 Testing each pattern individually:")
 

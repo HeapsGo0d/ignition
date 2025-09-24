@@ -162,8 +162,9 @@ setup_storage() {
 # Initialize minimal privacy system
 initialize_privacy() {
     if [[ "${PRIVACY_BYPASS:-0}" == "1" ]]; then
-        log "WARN" "⚠️ PRIVACY BYPASS ACTIVE - ALL NETWORK MONITORING DISABLED"
-        log "INFO" ""
+        echo "⚠️⚠️⚠️ PRIVACY BYPASS ACTIVE - NO NETWORK PROTECTION ⚠️⚠️⚠️" | tee /dev/stderr
+        echo "⚠️⚠️⚠️ ALL TELEMETRY AND TRACKING ENABLED ⚠️⚠️⚠️" | tee /dev/stderr
+        log "WARN" "PRIVACY BYPASS ACTIVE - ALL NETWORK MONITORING DISABLED"
         return
     fi
 

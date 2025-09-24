@@ -33,7 +33,9 @@ mkdir -p "$PROXY_CONFIG_DIR"
 # Check if privacy is bypassed
 check_bypass() {
     if [[ "${PRIVACY_BYPASS:-0}" == "1" ]]; then
-        log "WARN" "⚠️ PRIVACY BYPASS ACTIVE - ALL NETWORK MONITORING DISABLED"
+        echo "⚠️⚠️⚠️ PRIVACY BYPASS ACTIVE - NO NETWORK PROTECTION ⚠️⚠️⚠️" | tee /dev/stderr
+        echo "⚠️⚠️⚠️ ALL TELEMETRY AND TRACKING ENABLED ⚠️⚠️⚠️" | tee /dev/stderr
+        log "WARN" "PRIVACY BYPASS ACTIVE - ALL NETWORK MONITORING DISABLED"
         return 0
     fi
     return 1
@@ -186,12 +188,21 @@ start_privoxy() {
     privoxy --no-daemon "$PRIVOXY_CONFIG" &
     local proxy_pid=$!
 
-    # Wait for proxy to start
-    sleep 2
+    # Wait for proxy to be ready (up to 10 seconds)
+    log "INFO" "Waiting for privoxy to bind to port $PROXY_PORT..."
+    local ready=false
+    for i in {1..20}; do
+        if netstat -tln | grep -q ":$PROXY_PORT "; then
+            ready=true
+            log "INFO" "privoxy ready after $((i * 500))ms"
+            break
+        fi
+        sleep 0.5
+    done
 
     # Verify proxy is listening
-    if ! netstat -tln | grep -q ":$PROXY_PORT "; then
-        log "ERROR" "privoxy failed to bind to port $PROXY_PORT"
+    if [[ "$ready" != "true" ]]; then
+        log "ERROR" "privoxy failed to bind to port $PROXY_PORT after 10s timeout"
         kill $proxy_pid 2>/dev/null || true
         return 1
     fi
