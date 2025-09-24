@@ -71,7 +71,6 @@ export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
 # IEC environment defaults
 export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
 export IEC_TIMEOUT_SEC="${IEC_TIMEOUT_SEC:-30}"
-export IEC_EXIT_TIMEOUT_SEC="${IEC_EXIT_TIMEOUT_SEC:-30}"
 
 # Source IEC helpers after environment is set up
 if [[ -f "$SCRIPT_DIR/cleanup-helpers.sh" ]]; then
@@ -379,14 +378,17 @@ cleanup() {
     if [[ "$IEC_AVAILABLE" == "true" && "$IEC_MODE_ON_EXIT" != "off" ]]; then
         log "INFO" "🧹 Running IEC cleanup mode: $IEC_MODE_ON_EXIT"
 
-        # Scale timeout based on cleanup mode
-        local exit_timeout="$IEC_EXIT_TIMEOUT_SEC"
+        # Calculate exit timeout based on cleanup mode (context-aware scaling)
+        local exit_timeout
         case "$IEC_MODE_ON_EXIT" in
-            basic) exit_timeout=10 ;;
-            enhanced) exit_timeout=20 ;;
-            nuclear) exit_timeout=30 ;;
-            *) exit_timeout="$IEC_EXIT_TIMEOUT_SEC" ;;
+            basic) exit_timeout=$((IEC_TIMEOUT_SEC / 3)) ;;      # 1/3 of full timeout (e.g., 10s from 30s)
+            enhanced) exit_timeout=$((IEC_TIMEOUT_SEC * 2 / 3)) ;; # 2/3 of full timeout (e.g., 20s from 30s)
+            nuclear) exit_timeout="$IEC_TIMEOUT_SEC" ;;           # Full timeout for nuclear
+            *) exit_timeout=$((IEC_TIMEOUT_SEC / 2)) ;;           # Default to half timeout
         esac
+
+        # Ensure minimum timeout values
+        [[ $exit_timeout -lt 5 ]] && exit_timeout=5
 
         # Run cleanup in background to avoid hanging the shutdown
         timeout "${exit_timeout}s" ignition-cleanup "$IEC_MODE_ON_EXIT" 2>/dev/null || {

@@ -87,70 +87,102 @@ EOF
 discover_writable_locations() {
     log "INFO" "🔍 Discovering writable locations (for testing/audit)..."
 
+    # Discovery configuration
+    local max_depth=5
+    local size_threshold_mb=5
+    local discovery_timeout=60
+    local max_results_per_section=20
+
     echo "# Writable Location Discovery Report"
     echo "# Generated: $(date)"
     echo "# Purpose: Find locations that need cleanup coverage"
+    echo "# Limits: max_depth=$max_depth, size_threshold=${size_threshold_mb}MB, timeout=${discovery_timeout}s"
     echo ""
 
-    echo "## Recently Modified Files (last 60 minutes)"
-    find /workspace -type f -mmin -60 -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
-        head -50 | while read -r file; do
-        echo "  $file ($(stat -c %y "$file" 2>/dev/null || echo "unknown date"))"
-    done
+    # Set up discovery timeout
+    local timeout_pid
+    if [[ $discovery_timeout -gt 0 ]]; then
+        (
+            sleep $discovery_timeout
+            log "WARN" "Discovery timeout reached (${discovery_timeout}s), results may be incomplete"
+            pkill -P $$ find 2>/dev/null || true
+        ) &
+        timeout_pid=$!
+    fi
+
+    echo "## Recently Modified Files (last 60 minutes, >${size_threshold_mb}MB)"
+    timeout 30s find /workspace -maxdepth $max_depth -type f -mmin -60 -not -path "*/.*" -not -path "*/.git/*" -size +${size_threshold_mb}M 2>/dev/null | \
+        head -$max_results_per_section | while read -r file; do
+        local size=$(get_size_mb "$file")
+        echo "  $file (${size}MB, $(stat -c %y "$file" 2>/dev/null | cut -d. -f1))"
+    done 2>/dev/null || echo "  (timeout or error during file discovery)"
     echo ""
 
-    echo "## Directories with Recent Activity"
-    find /workspace -type d -mmin -60 -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
-        head -20 | while read -r dir; do
-        local count=$(find "$dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
-        local size=$(get_size_mb "$dir")
-        echo "  $dir ($count files, ${size}MB)"
-    done
-    echo ""
-
-    echo "## Large Directories (>10MB)"
-    find /workspace -type d -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
-        head -50 | while read -r dir; do
+    echo "## Directories with Recent Activity (>${size_threshold_mb}MB)"
+    timeout 30s find /workspace -maxdepth $max_depth -type d -mmin -60 -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
+        head -$max_results_per_section | while read -r dir; do
         local size_mb=$(get_size_mb "$dir")
-        # Use awk instead of bc for better portability
+        if awk "BEGIN {exit !($size_mb > $size_threshold_mb)}"; then
+            local count=$(find "$dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
+            echo "  $dir ($count files, ${size_mb}MB)"
+        fi
+    done 2>/dev/null || echo "  (timeout or error during directory discovery)"
+    echo ""
+
+    echo "## Large Directories (>10MB, depth limited)"
+    timeout 30s find /workspace -maxdepth $max_depth -type d -not -path "*/.*" -not -path "*/.git/*" 2>/dev/null | \
+        while read -r dir; do
+        local size_mb=$(get_size_mb "$dir")
         if awk "BEGIN {exit !($size_mb > 10.0)}"; then
             echo "  $dir (${size_mb}MB)"
         fi
-    done | head -20
+    done 2>/dev/null | head -$max_results_per_section || echo "  (timeout or error during size calculation)"
     echo ""
 
-    echo "## Cache and Temporary Directories"
-    find /workspace -type d -name "*cache*" -o -name "*tmp*" -o -name "*temp*" 2>/dev/null | \
-        while read -r dir; do
+    echo "## Cache and Temporary Directories (>${size_threshold_mb}MB)"
+    timeout 20s find /workspace -maxdepth $max_depth -type d \( -name "*cache*" -o -name "*tmp*" -o -name "*temp*" \) 2>/dev/null | \
+        head -$max_results_per_section | while read -r dir; do
         local size_mb=$(get_size_mb "$dir")
-        echo "  $dir (${size_mb}MB)"
-    done
+        if awk "BEGIN {exit !($size_mb > $size_threshold_mb)}"; then
+            echo "  $dir (${size_mb}MB)"
+        fi
+    done 2>/dev/null || echo "  (timeout or error during cache discovery)"
     echo ""
 
-    echo "## Database and State Files"
-    find /workspace -name "*.db" -o -name "*.sqlite" -o -name "*.json" -o -name "*.log" 2>/dev/null | \
-        head -20 | while read -r file; do
+    echo "## Database and State Files (>${size_threshold_mb}MB)"
+    timeout 20s find /workspace -maxdepth $max_depth \( -name "*.db" -o -name "*.sqlite" -o -name "*.json" -o -name "*.log" \) -size +${size_threshold_mb}M 2>/dev/null | \
+        head -$max_results_per_section | while read -r file; do
         local size_mb=$(get_size_mb "$file")
         echo "  $file (${size_mb}MB)"
-    done
+    done 2>/dev/null || echo "  (timeout or error during database discovery)"
     echo ""
 
     echo "## ComfyUI Output Patterns"
-    find /workspace -name "ComfyUI_*.png" -o -name "*.txt" -path "*/output*" 2>/dev/null | \
+    timeout 15s find /workspace -maxdepth $max_depth \( -name "ComfyUI_*.png" -o -name "*.txt" -path "*/output*" \) 2>/dev/null | \
         head -10 | while read -r file; do
-        echo "  $file"
-    done
+        local size_mb=$(get_size_mb "$file")
+        echo "  $file (${size_mb}MB)"
+    done 2>/dev/null || echo "  (timeout or error during output discovery)"
     echo ""
 
-    echo "## Process-Specific Directories"
-    if command -v lsof >/dev/null; then
-        echo "### Files currently open by processes"
-        lsof 2>/dev/null | grep "/workspace" | awk '{print $9}' | sort -u | head -10 | \
+    echo "## Process-Specific Files (if lsof available)"
+    if command -v lsof >/dev/null 2>&1; then
+        timeout 10s lsof +D /workspace 2>/dev/null | awk 'NR>1 {print $9}' | grep -v "^$" | sort -u | head -10 | \
             while read -r file; do
-            echo "  $file"
-        done
+            if [[ -n "$file" ]]; then
+                echo "  $file (open by process)"
+            fi
+        done 2>/dev/null || echo "  (timeout or error accessing open files)"
+    else
+        echo "  (lsof not available - install for process file handle detection)"
     fi
     echo ""
+
+    # Clean up timeout process
+    if [[ -n "$timeout_pid" ]]; then
+        kill "$timeout_pid" 2>/dev/null || true
+        wait "$timeout_pid" 2>/dev/null || true
+    fi
 
     echo "## Recommended Actions"
     echo "1. Review Recent Activity section for active write locations"
@@ -158,9 +190,10 @@ discover_writable_locations() {
     echo "3. Ensure Cache/Temp directories are covered by IEC_DATA_CACHE"
     echo "4. Verify Database files are under IEC_DATA_STATE"
     echo "5. Confirm output patterns match IEC_DATA_OUTPUTS"
+    echo "6. Consider pinning important files found in discovery"
     echo ""
 
-    log "INFO" "✅ Discovery complete - review output for missing cleanup targets"
+    log "INFO" "✅ Discovery complete - review output for missing cleanup targets (depth=$max_depth, threshold=${size_threshold_mb}MB)"
 }
 
 # Calculate size before cleanup
@@ -259,6 +292,21 @@ cleanup_enhanced() {
 # Nuclear cleanup mode
 cleanup_nuclear() {
     local confirmed="$1"
+
+    # Mandatory security check - log all nuclear mode invocations
+    log "WARN" "Nuclear cleanup initiated (confirmed=$confirmed, NUKE=${NUKE:-unset})"
+
+    # Even with --yes, require NUKE=YES environment variable for true bypass
+    if [[ "$confirmed" == "yes" && "${NUKE:-}" != "YES" ]]; then
+        echo -e "${RED}⚠️  SECURITY WARNING ⚠️${NC}"
+        echo ""
+        echo "Nuclear mode with --yes flag requires NUKE=YES environment variable."
+        echo "This prevents accidental automation bypasses."
+        echo ""
+        echo "To proceed: NUKE=YES ignition-cleanup nuclear --yes"
+        log "ERROR" "Nuclear cleanup blocked: --yes without NUKE=YES"
+        exit 1
+    fi
 
     if [[ "$confirmed" != "yes" ]]; then
         echo -e "${RED}⚠️  NUCLEAR MODE WARNING ⚠️${NC}"

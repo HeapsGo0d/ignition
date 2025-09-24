@@ -82,22 +82,76 @@ print_iec_banner() {
     echo -e "${NC}"
 }
 
-# Size calculation utilities
+# Size calculation utilities with robust error handling
 get_size_gb() {
     local path="$1"
-    if [[ -e "$path" ]]; then
-        du -sb "$path" 2>/dev/null | awk '{printf "%.2f", $1/1024/1024/1024}'
-    else
+    if [[ ! -e "$path" ]]; then
         echo "0.00"
+        return 0
+    fi
+
+    local du_output
+    du_output=$(du -sb "$path" 2>/dev/null)
+    local du_exit=$?
+
+    if [[ $du_exit -ne 0 || -z "$du_output" ]]; then
+        log "DEBUG" "du command failed for path: $path"
+        echo "0.00"
+        return 0
+    fi
+
+    # Validate du output format (should be "SIZE\tPATH")
+    local size_bytes=$(echo "$du_output" | awk '{print $1}')
+    if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
+        log "DEBUG" "Invalid du output for path: $path (output: $du_output)"
+        echo "0.00"
+        return 0
+    fi
+
+    # Convert to GB with error handling
+    local size_gb
+    size_gb=$(awk "BEGIN {printf \"%.2f\", $size_bytes/1024/1024/1024}" 2>/dev/null)
+    if [[ $? -ne 0 || -z "$size_gb" ]]; then
+        log "DEBUG" "awk conversion failed for bytes: $size_bytes"
+        echo "0.00"
+    else
+        echo "$size_gb"
     fi
 }
 
 get_size_mb() {
     local path="$1"
-    if [[ -e "$path" ]]; then
-        du -sb "$path" 2>/dev/null | awk '{printf "%.1f", $1/1024/1024}'
-    else
+    if [[ ! -e "$path" ]]; then
         echo "0.0"
+        return 0
+    fi
+
+    local du_output
+    du_output=$(du -sb "$path" 2>/dev/null)
+    local du_exit=$?
+
+    if [[ $du_exit -ne 0 || -z "$du_output" ]]; then
+        log "DEBUG" "du command failed for path: $path"
+        echo "0.0"
+        return 0
+    fi
+
+    # Validate du output format
+    local size_bytes=$(echo "$du_output" | awk '{print $1}')
+    if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
+        log "DEBUG" "Invalid du output for path: $path (output: $du_output)"
+        echo "0.0"
+        return 0
+    fi
+
+    # Convert to MB with error handling
+    local size_mb
+    size_mb=$(awk "BEGIN {printf \"%.1f\", $size_bytes/1024/1024}" 2>/dev/null)
+    if [[ $? -ne 0 || -z "$size_mb" ]]; then
+        log "DEBUG" "awk conversion failed for bytes: $size_bytes"
+        echo "0.0"
+    else
+        echo "$size_mb"
     fi
 }
 
@@ -148,23 +202,111 @@ validate_cleanup_path() {
         resolved_path="$path"
     fi
 
+    # Resolve workspace path to handle case where /workspace itself is a symlink
+    local resolved_workspace
+    if [[ -e "/workspace" ]]; then
+        resolved_workspace=$(readlink -f "/workspace" 2>/dev/null)
+        if [[ -z "$resolved_workspace" ]]; then
+            log "ERROR" "Failed to resolve workspace path /workspace"
+            return 1
+        fi
+    else
+        resolved_workspace="/workspace"
+    fi
+    log "DEBUG" "Resolved workspace: $resolved_workspace"
+
     # Check for symlinks and validate them
     if [[ -L "$path" ]]; then
         log "DEBUG" "Symlink detected: $path -> $resolved_path"
-        # Additional symlink validation - ensure target is also safe
-        if [[ "$resolved_path" != "/workspace"* ]]; then
-            log "ERROR" "Symlink target outside workspace: $path -> $resolved_path"
+        # Additional symlink validation - ensure target is under resolved workspace
+        if [[ "$resolved_path" != "$resolved_workspace"* ]]; then
+            log "ERROR" "Symlink target outside workspace: $path -> $resolved_path (workspace: $resolved_workspace)"
             return 1
         fi
     fi
 
-    # Check if under /workspace (unless specifically allowing root paths)
-    if [[ "$allow_root_paths" != "true" ]] && [[ "$resolved_path" != "/workspace"* ]]; then
-        log "ERROR" "Path outside workspace: $resolved_path"
+    # Check if under resolved workspace (unless specifically allowing root paths)
+    if [[ "$allow_root_paths" != "true" ]] && [[ "$resolved_path" != "$resolved_workspace"* ]]; then
+        log "ERROR" "Path outside workspace: $resolved_path (workspace: $resolved_workspace)"
         return 1
     fi
 
     log "DEBUG" "Path validated: $resolved_path"
+    return 0
+}
+
+# Pin pattern validation
+validate_pin_pattern() {
+    local pattern="$1"
+
+    # Check basic pattern structure
+    if [[ -z "$pattern" ]]; then
+        return 1
+    fi
+
+    case "$pattern" in
+        model:*)
+            # Model tag format: model:name (alphanumeric, hyphens, underscores)
+            local model_tag="${pattern#model:}"
+            if [[ -z "$model_tag" ]] || [[ ! "$model_tag" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                log "DEBUG" "Invalid model tag format: $pattern"
+                return 1
+            fi
+            ;;
+        folder:*)
+            # Folder path format: folder:/absolute/path
+            local folder_path="${pattern#folder:}"
+            if [[ -z "$folder_path" ]] || [[ "$folder_path" != /* ]]; then
+                log "DEBUG" "Invalid folder path format (must be absolute): $pattern"
+                return 1
+            fi
+            # Check for dangerous folder patterns
+            case "$folder_path" in
+                /|/bin|/usr|/etc|/var|/home|/root)
+                    log "DEBUG" "Dangerous folder path not allowed: $pattern"
+                    return 1
+                    ;;
+            esac
+            ;;
+        /*)
+            # Absolute path format
+            # Check for dangerous absolute paths
+            case "$pattern" in
+                /|/bin/*|/usr/*|/etc/*|/var/*|/home/*|/root/*)
+                    log "DEBUG" "Dangerous absolute path not allowed: $pattern"
+                    return 1
+                    ;;
+            esac
+            ;;
+        */*)
+            # Relative path with directory separator - validate basic structure
+            if [[ "$pattern" =~ \.\./|\./\. ]]; then
+                log "DEBUG" "Unsafe path traversal in pattern: $pattern"
+                return 1
+            fi
+            ;;
+        *.*)
+            # Glob pattern with extension - basic validation
+            if [[ ${#pattern} -gt 100 ]]; then
+                log "DEBUG" "Pattern too long: $pattern"
+                return 1
+            fi
+            ;;
+        *)
+            # Simple filename pattern
+            if [[ ${#pattern} -gt 50 ]]; then
+                log "DEBUG" "Pattern too long: $pattern"
+                return 1
+            fi
+            # Check for suspicious characters
+            if [[ "$pattern" =~ [[:space:]\$\`] ]]; then
+                log "DEBUG" "Suspicious characters in pattern: $pattern"
+                return 1
+            fi
+            ;;
+    esac
+
+    log "DEBUG" "Valid pin pattern: $pattern"
     return 0
 }
 
@@ -187,12 +329,18 @@ load_pins() {
             # Skip comments and empty lines
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
             [[ -z "${line// }" ]] && continue
-            pins+=("$line")
+
+            # Validate pin pattern format
+            if validate_pin_pattern "$line"; then
+                pins+=("$line")
+            else
+                log "WARN" "Invalid pin pattern skipped: $line"
+            fi
         done < "$IEC_PINS_FILE" 2>/dev/null || {
             log "WARN" "Failed to read pins file: $IEC_PINS_FILE"
             return 0  # Return empty list on read failure
         }
-        log "DEBUG" "Loaded ${#pins[@]} pins from $IEC_PINS_FILE"
+        log "DEBUG" "Loaded ${#pins[@]} valid pins from $IEC_PINS_FILE"
     else
         log "DEBUG" "No pins file found at $IEC_PINS_FILE (this is normal)"
     fi
@@ -257,19 +405,52 @@ acquire_cleanup_lock() {
     local timeout=${1:-10}
     local count=0
 
-    while [[ $count -lt $timeout ]]; do
-        if (set -C; echo $$ > "$IEC_LOCK_FILE") 2>/dev/null; then
-            log "DEBUG" "Acquired cleanup lock"
+    # Try flock first for atomic locking (if available)
+    if command -v flock >/dev/null 2>&1; then
+        log "DEBUG" "Using flock for atomic lock acquisition"
+        if flock -x -w "$timeout" "$IEC_LOCK_FILE" echo $$ 2>/dev/null; then
+            log "DEBUG" "Acquired cleanup lock (flock)"
             return 0
+        else
+            log "ERROR" "Failed to acquire flock after ${timeout}s"
+            return 1
+        fi
+    fi
+
+    # Fallback to improved noclobber method
+    log "DEBUG" "Using noclobber fallback for lock acquisition"
+    while [[ $count -lt $timeout ]]; do
+        # Atomic test-and-set with validation
+        if (set -C; echo "$$:$(date +%s)" > "$IEC_LOCK_FILE") 2>/dev/null; then
+            # Validate we actually got the lock (race condition check)
+            local lock_content=$(cat "$IEC_LOCK_FILE" 2>/dev/null || echo "")
+            if [[ "$lock_content" == "$$:"* ]]; then
+                log "DEBUG" "Acquired cleanup lock (noclobber)"
+                return 0
+            else
+                log "WARN" "Lock acquisition race detected, retrying"
+                rm -f "$IEC_LOCK_FILE" 2>/dev/null || true
+            fi
         fi
 
-        # Check if existing lock is stale
+        # Check for stale locks with atomic cleanup
         if [[ -f "$IEC_LOCK_FILE" ]]; then
-            local lock_pid=$(cat "$IEC_LOCK_FILE" 2>/dev/null || echo "")
-            if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
-                log "WARN" "Removing stale lock (PID $lock_pid)"
+            local lock_content=$(cat "$IEC_LOCK_FILE" 2>/dev/null || echo "")
+            local lock_pid="${lock_content%%:*}"
+            local lock_time="${lock_content##*:}"
+
+            if [[ -n "$lock_pid" ]] && [[ "$lock_pid" =~ ^[0-9]+$ ]]; then
+                if ! kill -0 "$lock_pid" 2>/dev/null; then
+                    # Atomic stale lock removal
+                    log "WARN" "Removing stale lock (PID $lock_pid)"
+                    if (set -C; rm "$IEC_LOCK_FILE" && echo "$$:$(date +%s)" > "$IEC_LOCK_FILE") 2>/dev/null; then
+                        log "DEBUG" "Acquired cleanup lock after stale removal"
+                        return 0
+                    fi
+                fi
+            else
+                log "WARN" "Invalid lock file format, attempting cleanup"
                 rm -f "$IEC_LOCK_FILE" 2>/dev/null || true
-                continue
             fi
         fi
 
@@ -341,8 +522,53 @@ quiesce_services() {
         rm -f /tmp/proxy.pid 2>/dev/null || true
     fi
 
-    # Brief pause for file handles to close
-    sleep 1
+    # Stop aria2c download processes
+    if pgrep -f "aria2c" >/dev/null; then
+        log "INFO" "  • Stopping aria2c..."
+        pkill -TERM -f "aria2c" 2>/dev/null || true
+        sleep 2
+        pkill -KILL -f "aria2c" 2>/dev/null || true
+    fi
+
+    # Stop privacy monitoring processes
+    for privacy_proc in "privacy_state_manager.py" "activity_detector.py" "connection_monitor.sh"; do
+        if pgrep -f "$privacy_proc" >/dev/null; then
+            log "INFO" "  • Stopping $privacy_proc..."
+            pkill -TERM -f "$privacy_proc" 2>/dev/null || true
+        fi
+    done
+
+    # Stop any download processes that might have file handles
+    for download_proc in "download_.*\\.py" "wget" "curl.*-o"; do
+        if pgrep -f "$download_proc" >/dev/null; then
+            log "INFO" "  • Stopping download processes..."
+            pkill -TERM -f "$download_proc" 2>/dev/null || true
+            sleep 1
+            pkill -KILL -f "$download_proc" 2>/dev/null || true
+            break  # Only log once for all download processes
+        fi
+    done
+
+    # Stop any Python processes that might be holding file handles in workspace
+    local workspace_python_pids=$(lsof +D /workspace 2>/dev/null | awk '/python/ {print $2}' | sort -u || true)
+    if [[ -n "$workspace_python_pids" ]]; then
+        log "INFO" "  • Stopping Python processes with workspace file handles..."
+        echo "$workspace_python_pids" | while read -r pid; do
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                kill -TERM "$pid" 2>/dev/null || true
+            fi
+        done
+        sleep 2
+        # Force kill any remaining
+        echo "$workspace_python_pids" | while read -r pid; do
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    # Extended pause for file handles to close properly
+    sleep 2
     log "INFO" "Services quiesced"
 }
 

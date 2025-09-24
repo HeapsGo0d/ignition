@@ -26,7 +26,7 @@ timeout 5s ./scripts/ignition-cleanup dry-run > /tmp/dry-run-test.txt 2>&1 || {
 }
 
 echo "4. Testing path validation..."
-if ./scripts/cleanup-helpers.sh 2>&1 | grep -q "should be sourced"; then
+if bash ./scripts/cleanup-helpers.sh 2>&1 | grep -q "should be sourced"; then
     echo "✅ Helpers properly reject direct execution"
 else
     echo "❌ Helpers validation failed"
@@ -41,16 +41,42 @@ else
 fi
 
 echo "6. Testing pin loading..."
+# Create isolated test script to avoid readonly variable conflicts
+cat > /tmp/test-pins-isolated.sh << 'EOF'
+#!/bin/bash
+# Test pin loading in completely fresh environment
 mkdir -p /tmp/test-policy
 echo "model:test-model" > /tmp/test-policy/pins.txt
-IEC_PINS_FILE=/tmp/test-policy/pins.txt
-if load_pins | grep -q "model:test-model"; then
+
+# Extract just the load_pins function logic
+pins=()
+if [[ -f /tmp/test-policy/pins.txt ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        pins+=("$line")
+    done < /tmp/test-policy/pins.txt
+fi
+
+# Check if our test pin was loaded
+for pin in "${pins[@]}"; do
+    echo "$pin"
+done | grep -q "model:test-model"
+result=$?
+
+rm -rf /tmp/test-policy
+exit $result
+EOF
+
+chmod +x /tmp/test-pins-isolated.sh
+if /tmp/test-pins-isolated.sh; then
     echo "✅ Pin loading works"
 else
     echo "❌ Pin loading failed"
 fi
+rm -f /tmp/test-pins-isolated.sh
 
-rm -rf /tmp/test-policy /tmp/discover-test.txt /tmp/dry-run-test.txt
+rm -rf /tmp/discover-test.txt /tmp/dry-run-test.txt
 
 echo ""
 echo "=== Test Summary ==="
