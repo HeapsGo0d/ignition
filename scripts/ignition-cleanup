@@ -218,21 +218,38 @@ discover_writable_locations() {
 calculate_initial_sizes() {
     local mode="$1"
 
+    log "DEBUG" "calculate_initial_sizes started - CLEANUP_SCAN_MODELS=${CLEANUP_SCAN_MODELS:-}"
+    log "DEBUG" "MODEL_DIRS_SKIP: ${MODEL_DIRS_SKIP:-}"
+    log "DEBUG" "Function entry timestamp: $(date +%s.%3N)"
+    log "DEBUG" "Mode: $mode"
+
     local total_gb=0
     case "$mode" in
         basic)
+            log "DEBUG" "Computing basic mode sizes: outputs + uploads + tmp"
+            log "DEBUG" "Before basic calculation: $(date +%s.%3N)"
             total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP")}")
+            log "DEBUG" "After basic calculation: $(date +%s.%3N) - Result: ${total_gb}GB"
             ;;
         enhanced)
+            log "DEBUG" "Computing enhanced mode sizes: outputs + uploads + tmp + cache"
+            log "DEBUG" "Before enhanced calculation: $(date +%s.%3N)"
             total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE")}")
+            log "DEBUG" "After enhanced calculation: $(date +%s.%3N) - Result: ${total_gb}GB"
             ;;
         nuclear)
             if [[ "$CLEANUP_DELETE_MODELS" == "1" ]]; then
+                log "DEBUG" "Computing nuclear mode with models: full + models"
+                log "DEBUG" "Before nuclear+models calculation: $(date +%s.%3N)"
                 # Include models in nuclear calculation only when explicitly enabled
                 total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE") + $(get_cached_model_size)}")
+                log "DEBUG" "After nuclear+models calculation: $(date +%s.%3N) - Result: ${total_gb}GB"
             else
+                log "DEBUG" "Computing nuclear mode without models: outputs + uploads + tmp + cache + state"
+                log "DEBUG" "Before nuclear calculation: $(date +%s.%3N)"
                 # Standard nuclear without models
                 total_gb=$(awk "BEGIN {printf \"%.2f\", $(get_size_gb "$IEC_DATA_OUTPUTS") + $(get_size_gb "$IEC_DATA_UPLOADS") + $(get_size_gb "$IEC_TMP") + $(get_size_gb "$IEC_DATA_CACHE") + $(get_size_gb "$IEC_DATA_STATE")}")
+                log "DEBUG" "After nuclear calculation: $(date +%s.%3N) - Result: ${total_gb}GB"
             fi
             ;;
     esac
