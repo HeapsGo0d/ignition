@@ -844,31 +844,63 @@ generate_cleanup_report() {
 
 # SSH environment detection
 is_ssh_environment() {
-    [[ -n "${SSH_CLIENT:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" ]]
+    echo "DEBUG: is_ssh_environment - function entry - $(date +%s.%3N)"
+    echo "DEBUG: SSH_CLIENT=${SSH_CLIENT:-not_set}"
+    echo "DEBUG: SSH_CONNECTION=${SSH_CONNECTION:-not_set}"
+    echo "DEBUG: SSH_TTY=${SSH_TTY:-not_set}"
+
+    local result
+    if [[ -n "${SSH_CLIENT:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" ]]; then
+        result=true
+        echo "DEBUG: is_ssh_environment - SSH detected - $(date +%s.%3N)"
+    else
+        result=false
+        echo "DEBUG: is_ssh_environment - no SSH detected - $(date +%s.%3N)"
+    fi
+
+    echo "DEBUG: is_ssh_environment - function exit - $(date +%s.%3N)"
+    $result
 }
 
 # Get the main script process PID (not shell PID)
 get_script_pid() {
+    echo "DEBUG: get_script_pid - function entry - $(date +%s.%3N)"
+
     if is_ssh_environment; then
+        echo "DEBUG: get_script_pid - SSH environment, using BASHPID - $(date +%s.%3N)"
         # In SSH environment, use current bash PID to avoid affecting SSH session
         echo "$BASHPID"
     else
+        echo "DEBUG: get_script_pid - local environment, using shell PID - $(date +%s.%3N)"
         # In local environment, use shell PID
         echo "$$"
     fi
+
+    echo "DEBUG: get_script_pid - function exit - $(date +%s.%3N)"
 }
 
 # Timeout handling
 setup_timeout() {
+    echo "DEBUG: setup_timeout - function entry - $(date +%s.%3N)"
     local timeout_sec="$1"
     local cleanup_func="${2:-cleanup_timeout}"
+    echo "DEBUG: setup_timeout - timeout_sec=$timeout_sec, cleanup_func=$cleanup_func - $(date +%s.%3N)"
 
     if [[ "$timeout_sec" -gt 0 ]]; then
+        echo "DEBUG: setup_timeout - timeout > 0, proceeding - $(date +%s.%3N)"
+
         # Check if we're in SSH environment and adjust behavior
+        echo "DEBUG: setup_timeout - before is_ssh_environment check - $(date +%s.%3N)"
         if is_ssh_environment; then
+            echo "DEBUG: setup_timeout - SSH environment path selected - $(date +%s.%3N)"
             log "DEBUG" "SSH environment detected - using file-based timeout: ${timeout_sec}s"
+
             # Use file-based timeout mechanism to avoid SSH session interference
+            echo "DEBUG: setup_timeout - creating timeout flag - $(date +%s.%3N)"
             local timeout_flag="/tmp/iec-timeout-$$-$RANDOM"
+            echo "DEBUG: setup_timeout - timeout_flag=$timeout_flag - $(date +%s.%3N)"
+
+            echo "DEBUG: setup_timeout - before background process spawn (SSH) - $(date +%s.%3N)"
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
@@ -876,21 +908,44 @@ setup_timeout() {
                 # Send signal to specific script process, not shell
                 kill -USR1 $(get_script_pid) 2>/dev/null || true
             ) &
+            echo "DEBUG: setup_timeout - after background process spawn (SSH) - $(date +%s.%3N)"
+
             local timeout_pid=$!
+            echo "DEBUG: setup_timeout - background PID=$timeout_pid (SSH) - $(date +%s.%3N)"
+
+            echo "DEBUG: setup_timeout - before trap setup (SSH) - $(date +%s.%3N)"
             trap "$cleanup_func $timeout_pid $timeout_flag" USR1
+            echo "DEBUG: setup_timeout - after trap setup (SSH) - $(date +%s.%3N)"
+
+            echo "DEBUG: setup_timeout - returning PID (SSH) - $(date +%s.%3N)"
             echo "$timeout_pid"
         else
+            echo "DEBUG: setup_timeout - local environment path selected - $(date +%s.%3N)"
             log "DEBUG" "Local environment - using standard timeout: ${timeout_sec}s"
+
+            echo "DEBUG: setup_timeout - before background process spawn (local) - $(date +%s.%3N)"
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
                 kill -USR1 $$ 2>/dev/null || true
             ) &
+            echo "DEBUG: setup_timeout - after background process spawn (local) - $(date +%s.%3N)"
+
             local timeout_pid=$!
+            echo "DEBUG: setup_timeout - background PID=$timeout_pid (local) - $(date +%s.%3N)"
+
+            echo "DEBUG: setup_timeout - before trap setup (local) - $(date +%s.%3N)"
             trap "$cleanup_func $timeout_pid" USR1
+            echo "DEBUG: setup_timeout - after trap setup (local) - $(date +%s.%3N)"
+
+            echo "DEBUG: setup_timeout - returning PID (local) - $(date +%s.%3N)"
             echo "$timeout_pid"
         fi
+    else
+        echo "DEBUG: setup_timeout - timeout <= 0, skipping - $(date +%s.%3N)"
     fi
+
+    echo "DEBUG: setup_timeout - function exit - $(date +%s.%3N)"
 }
 
 cleanup_timeout() {
