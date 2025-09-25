@@ -842,28 +842,70 @@ generate_cleanup_report() {
     log "INFO" "IEC $action mode=$mode freed=${freed_gb}GB pins=$pinned_count duration=${duration_sec}s"
 }
 
+# SSH environment detection
+is_ssh_environment() {
+    [[ -n "${SSH_CLIENT:-}" || -n "${SSH_CONNECTION:-}" || -n "${SSH_TTY:-}" ]]
+}
+
+# Get the main script process PID (not shell PID)
+get_script_pid() {
+    if is_ssh_environment; then
+        # In SSH environment, use current bash PID to avoid affecting SSH session
+        echo "$BASHPID"
+    else
+        # In local environment, use shell PID
+        echo "$$"
+    fi
+}
+
 # Timeout handling
 setup_timeout() {
     local timeout_sec="$1"
     local cleanup_func="${2:-cleanup_timeout}"
 
     if [[ "$timeout_sec" -gt 0 ]]; then
-        log "DEBUG" "Setting up timeout: ${timeout_sec}s"
-        (
-            sleep "$timeout_sec"
-            log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
-            kill -USR1 $$ 2>/dev/null || true
-        ) &
-        local timeout_pid=$!
-        trap "$cleanup_func $timeout_pid" USR1
-        echo "$timeout_pid"
+        # Check if we're in SSH environment and adjust behavior
+        if is_ssh_environment; then
+            log "DEBUG" "SSH environment detected - using file-based timeout: ${timeout_sec}s"
+            # Use file-based timeout mechanism to avoid SSH session interference
+            local timeout_flag="/tmp/iec-timeout-$$-$RANDOM"
+            (
+                sleep "$timeout_sec"
+                log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
+                touch "$timeout_flag"
+                # Send signal to specific script process, not shell
+                kill -USR1 $(get_script_pid) 2>/dev/null || true
+            ) &
+            local timeout_pid=$!
+            trap "$cleanup_func $timeout_pid $timeout_flag" USR1
+            echo "$timeout_pid"
+        else
+            log "DEBUG" "Local environment - using standard timeout: ${timeout_sec}s"
+            (
+                sleep "$timeout_sec"
+                log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
+                kill -USR1 $$ 2>/dev/null || true
+            ) &
+            local timeout_pid=$!
+            trap "$cleanup_func $timeout_pid" USR1
+            echo "$timeout_pid"
+        fi
     fi
 }
 
 cleanup_timeout() {
     local timeout_pid="$1"
+    local timeout_flag="$2"
+
     log "WARN" "Cleanup stopped due to timeout budget"
+
+    # Clean up timeout process
     kill "$timeout_pid" 2>/dev/null || true
+
+    # Clean up timeout flag file if it exists
+    [[ -n "$timeout_flag" && -f "$timeout_flag" ]] && rm -f "$timeout_flag" 2>/dev/null || true
+
+    # Use specific exit code for timeout
     exit 124  # timeout exit code
 }
 
