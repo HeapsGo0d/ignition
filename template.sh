@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v2.2 - Minimal Privacy"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, minimal privacy system with Big Red Switch, and clean architecture"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.4.2"  # IEC SSH Timeout Fix - Resolves RunPod connection drops
+TEMPLATE_NAME="Ignition ComfyUI v2.4 - IEC Performance"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, Intelligent Ephemeral Cleanup (IEC) system, minimal privacy controls, and performance optimizations"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
