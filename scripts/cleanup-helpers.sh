@@ -5,23 +5,23 @@
 set -euo pipefail
 
 # IEC Configuration - Default paths for centralized writes
-readonly IEC_DATA_ROOT="/workspace/data"
-readonly IEC_DATA_OUTPUTS="$IEC_DATA_ROOT/outputs"
-readonly IEC_DATA_UPLOADS="$IEC_DATA_ROOT/uploads"
-readonly IEC_DATA_LOGS="$IEC_DATA_ROOT/logs"
-readonly IEC_DATA_CACHE="$IEC_DATA_ROOT/cache"
-readonly IEC_DATA_STATE="$IEC_DATA_ROOT/state"
-readonly IEC_MODELS="/workspace/models"
-readonly IEC_TMP="/workspace/tmp"
+IEC_DATA_ROOT="${IEC_DATA_ROOT:-/workspace/data}"
+IEC_DATA_OUTPUTS="${IEC_DATA_OUTPUTS:-$IEC_DATA_ROOT/outputs}"
+IEC_DATA_UPLOADS="${IEC_DATA_UPLOADS:-$IEC_DATA_ROOT/uploads}"
+IEC_DATA_LOGS="${IEC_DATA_LOGS:-$IEC_DATA_ROOT/logs}"
+IEC_DATA_CACHE="${IEC_DATA_CACHE:-$IEC_DATA_ROOT/cache}"
+IEC_DATA_STATE="${IEC_DATA_STATE:-$IEC_DATA_ROOT/state}"
+IEC_MODELS="${IEC_MODELS:-/workspace/models}"
+IEC_TMP="${IEC_TMP:-/workspace/tmp}"
 
 # IEC Runtime Configuration
-readonly IEC_POLICY_DIR="/workspace/policy"
-readonly IEC_PINS_FILE="$IEC_POLICY_DIR/pins.txt"
-readonly IEC_CLEANUP_LOG="$IEC_DATA_LOGS/cleanup.log"
-readonly IEC_LOCK_FILE="/tmp/cleanup-$$-$(id -u).lock"
-readonly IEC_SESSION_LOCK="/tmp/stale_session.lock"
-readonly IEC_MODEL_CACHE="$IEC_POLICY_DIR/model_sizes.cache"
-readonly IEC_MODEL_CACHE_INVALIDATE="$IEC_POLICY_DIR/model_sizes.cache.invalidate"
+IEC_POLICY_DIR="${IEC_POLICY_DIR:-/workspace/policy}"
+IEC_PINS_FILE="${IEC_PINS_FILE:-$IEC_POLICY_DIR/pins.txt}"
+IEC_CLEANUP_LOG="${IEC_CLEANUP_LOG:-$IEC_DATA_LOGS/cleanup.log}"
+IEC_LOCK_FILE="${IEC_LOCK_FILE:-/tmp/cleanup-$$-$(id -u).lock}"
+IEC_SESSION_LOCK="${IEC_SESSION_LOCK:-/tmp/stale_session.lock}"
+IEC_MODEL_CACHE="${IEC_MODEL_CACHE:-$IEC_POLICY_DIR/model_sizes.cache}"
+IEC_MODEL_CACHE_INVALIDATE="${IEC_MODEL_CACHE_INVALIDATE:-$IEC_POLICY_DIR/model_sizes.cache.invalidate}"
 
 # Environment defaults
 export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
@@ -38,12 +38,12 @@ export CLEANUP_DELETE_MODELS="${CLEANUP_DELETE_MODELS:-0}"
 export CLEANUP_ALLOW_MOUNTS="${CLEANUP_ALLOW_MOUNTS:-0}"
 
 # Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly NC='\033[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 # Logging functions
 log() {
