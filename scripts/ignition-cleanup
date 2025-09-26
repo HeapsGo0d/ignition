@@ -429,15 +429,11 @@ run_cleanup() {
     local mode="$1"
     local force_confirm="${2:-no}"
 
-    echo "DEBUG: Before lock acquisition - $(date +%s.%3N)"
-
     # Acquire lock
     if ! acquire_cleanup_lock; then
         log "ERROR" "Another cleanup is running"
         exit 1
     fi
-
-    echo "DEBUG: After lock acquisition - $(date +%s.%3N)"
 
     # Set up timeout - respect user's IEC_TIMEOUT_SEC or use mode-specific defaults
     local timeout_sec="$IEC_TIMEOUT_SEC"
@@ -461,27 +457,17 @@ run_cleanup() {
     # Record start time
     CLEANUP_START_TIME=$(date +%s)
 
-    echo "DEBUG: Before size calculation - $(date +%s.%3N)"
-
     # Calculate initial sizes
     local initial_gb=$(calculate_initial_sizes "$mode")
     CLEANUP_PINNED_COUNT=$(count_pinned_items "$mode")
 
-    echo "DEBUG: After size calculation - $(date +%s.%3N)"
-
     log "INFO" "Starting cleanup: mode=$mode, initial_size=${initial_gb}GB, pins=$CLEANUP_PINNED_COUNT"
     show_model_size_summary "$mode"
-
-    echo "DEBUG: Before service quiescing - $(date +%s.%3N)"
 
     # Quiesce services if not dry run
     if [[ "$IEC_DRY_RUN" != "1" ]]; then
         quiesce_services
     fi
-
-    echo "DEBUG: After service quiescing - $(date +%s.%3N)"
-
-    echo "DEBUG: Starting actual cleanup operations - $(date +%s.%3N)"
 
     # Run cleanup based on mode
     case "$mode" in
@@ -580,8 +566,6 @@ fi
 
 # Print banner
 print_iec_banner "$MODE" "cleanup"
-
-echo "DEBUG: After banner display - $(date +%s.%3N)"
 
 # Special handling for discover mode
 if [[ "$MODE" == "discover" ]]; then
