@@ -74,8 +74,10 @@ RUN mkdir -p /workspace/logs/privacy /workspace/privacy && \
     echo "files.civitai.com" >> /workspace/privacy/allowlist.txt && \
     echo "# NOTE: PyPI domains added only during PRIV_ALLOW_UPDATES=1" >> /workspace/privacy/allowlist.txt
 
-# Install filebrowser
-RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
+# Install filebrowser with retry and fallback
+RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash || \
+    (wget -O- https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash) || \
+    echo "Warning: filebrowser installation failed, continuing without it"
 
 # Copy scripts
 COPY scripts/ /workspace/scripts/
