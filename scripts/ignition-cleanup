@@ -218,10 +218,7 @@ discover_writable_locations() {
 calculate_initial_sizes() {
     local mode="$1"
 
-    log "DEBUG" "calculate_initial_sizes started - CLEANUP_SCAN_MODELS=${CLEANUP_SCAN_MODELS:-}"
-    log "DEBUG" "MODEL_DIRS_SKIP: ${MODEL_DIRS_SKIP:-}"
-    log "DEBUG" "Function entry timestamp: $(date +%s.%3N)"
-    log "DEBUG" "Mode: $mode"
+    echo "DEBUG: calculate_initial_sizes entry - $(date +%s.%3N)" >&2
 
     local total_gb=0
     case "$mode" in
@@ -254,6 +251,7 @@ calculate_initial_sizes() {
             ;;
     esac
 
+    echo "DEBUG: calculate_initial_sizes exit - $(date +%s.%3N)" >&2
     echo "$total_gb"
 }
 
@@ -283,6 +281,8 @@ count_pinned_items() {
     local mode="$1"
     local count=0
 
+    echo "DEBUG: count_pinned_items entry - $(date +%s.%3N)" >&2
+
     local paths=()
     case "$mode" in
         basic)
@@ -302,6 +302,7 @@ count_pinned_items() {
         fi
     done
 
+    echo "DEBUG: count_pinned_items exit - $(date +%s.%3N)" >&2
     echo "$count"
 }
 
@@ -429,11 +430,14 @@ run_cleanup() {
     local mode="$1"
     local force_confirm="${2:-no}"
 
+    echo "DEBUG: run_cleanup entry - $(date +%s.%3N)" >&2
+
     # Acquire lock
     if ! acquire_cleanup_lock; then
         log "ERROR" "Another cleanup is running"
         exit 1
     fi
+    echo "DEBUG: after acquire_cleanup_lock - $(date +%s.%3N)" >&2
 
     # Set up timeout - respect user's IEC_TIMEOUT_SEC or use mode-specific defaults
     local timeout_sec="$IEC_TIMEOUT_SEC"
@@ -453,21 +457,27 @@ run_cleanup() {
         TIMEOUT_PID=$(setup_timeout "$timeout_sec")
         log "DEBUG" "Timeout set: ${timeout_sec}s (PID: $TIMEOUT_PID)"
     fi
+    echo "DEBUG: after setup_timeout - $(date +%s.%3N)" >&2
 
     # Record start time
     CLEANUP_START_TIME=$(date +%s)
+    echo "DEBUG: after start_time - $(date +%s.%3N)" >&2
 
     # Calculate initial sizes
     local initial_gb=$(calculate_initial_sizes "$mode")
+    echo "DEBUG: after calculate_initial_sizes - $(date +%s.%3N)" >&2
     CLEANUP_PINNED_COUNT=$(count_pinned_items "$mode")
+    echo "DEBUG: after count_pinned_items - $(date +%s.%3N)" >&2
 
     log "INFO" "Starting cleanup: mode=$mode, initial_size=${initial_gb}GB, pins=$CLEANUP_PINNED_COUNT"
     show_model_size_summary "$mode"
+    echo "DEBUG: after show_model_size_summary - $(date +%s.%3N)" >&2
 
     # Quiesce services if not dry run
     if [[ "$IEC_DRY_RUN" != "1" ]]; then
         quiesce_services
     fi
+    echo "DEBUG: after quiesce_services - $(date +%s.%3N)" >&2
 
     # Run cleanup based on mode
     case "$mode" in
