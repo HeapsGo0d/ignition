@@ -454,6 +454,8 @@ run_cleanup() {
     # Otherwise, user's explicit timeout takes precedence
 
     if [[ "${IEC_TIMEOUT_SEC:-30}" -gt 0 ]]; then
+        # Fix: Pre-establish USR1 handler before timeout process
+        trap 'log "WARN" "Cleanup timeout triggered"; exit 124' USR1
         TIMEOUT_PID=$(setup_timeout "$timeout_sec")
         log "DEBUG" "Timeout set: ${timeout_sec}s (PID: $TIMEOUT_PID)"
     fi
