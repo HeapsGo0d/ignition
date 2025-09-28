@@ -868,6 +868,8 @@ setup_timeout() {
             log "DEBUG" "SSH environment detected - using file-based timeout: ${timeout_sec}s"
             # Use file-based timeout mechanism to avoid SSH session interference
             local timeout_flag="/tmp/iec-timeout-$$-$RANDOM"
+            # Install trap BEFORE starting background process to avoid race condition
+            trap "$cleanup_func \$timeout_pid $timeout_flag" USR1
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
@@ -876,17 +878,17 @@ setup_timeout() {
                 kill -USR1 $(get_script_pid) 2>/dev/null || true
             ) &
             local timeout_pid=$!
-            trap "$cleanup_func $timeout_pid $timeout_flag" USR1
             echo "$timeout_pid"
         else
             log "DEBUG" "Local environment - using standard timeout: ${timeout_sec}s"
+            # Install trap BEFORE starting background process to avoid race condition
+            trap "$cleanup_func \$timeout_pid" USR1
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
                 kill -USR1 $$ 2>/dev/null || true
             ) &
             local timeout_pid=$!
-            trap "$cleanup_func $timeout_pid" USR1
             echo "$timeout_pid"
         fi
     fi
