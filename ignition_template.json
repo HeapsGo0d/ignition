@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v2.6.0 - IEC Simple System",
-  "description": "Dynamic ComfyUI with runtime model downloads, minimal privacy system, and ultra-fast IEC Simple cleanup system (<0.015s)",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v2.6.0-iec-simple",
+  "name": "Ignition ComfyUI v2.7.0 - IEC Redesign + Signal Handling",
+  "description": "Dynamic ComfyUI with comprehensive privacy-aware cleanup, supervisor signal handling, and 4-tier cleanup system (basic/enhanced/nuclear/forensic)",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v2.7.0-iec-redesign",
   "ports": [
     {
       "privatePort": 8188,
@@ -100,8 +100,18 @@
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "IEC_MODE_ON_EXIT",
+      "value": "basic",
+      "description": "Cleanup mode on container exit (basic|enhanced|nuclear|off)"
+    },
+    {
+      "key": "IEC_DELETE_MODELS",
+      "value": "0",
+      "description": "Allow model deletion in nuclear cleanup (0/1)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup-clean.sh"

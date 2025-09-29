@@ -15,18 +15,28 @@ TIMEOUT=30
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        basic|enhanced|nuclear) MODE="$1" ;;
+        basic|enhanced|nuclear|forensic) MODE="$1" ;;
         dry-run) MODE="enhanced"; DRY_RUN=1 ;;
         --timeout=*) TIMEOUT="${1#--timeout=}" ;;
         --help|-h)
-            echo -e "${GREEN}Ignition Cleanup (IEC Simple) - Ultra-fast container cleanup${NC}"
-            echo "Usage: ignition-cleanup [basic|enhanced|nuclear|dry-run] [--timeout=N]"
-            echo "Modes:"
-            echo "  basic    - Clean outputs, uploads, temp (<0.015s)"
-            echo "  enhanced - Basic + caches (<0.020s)"
-            echo "  nuclear  - Enhanced + state (use with caution)"
-            echo "  dry-run  - Preview mode"
-            echo "Environment: IEC_DELETE_MODELS=1 (allow model deletion), IEC_DRY_RUN=1"
+            echo -e "${GREEN}Ignition Cleanup (IEC Simple) - Privacy-aware container cleanup${NC}"
+            echo "Usage: ignition-cleanup [basic|enhanced|nuclear|forensic|dry-run] [--timeout=N]"
+            echo ""
+            echo "Cleanup Modes (increasing scope and privacy protection):"
+            echo "  basic    - Outputs, uploads, temp, bash history, recent logs (<0.015s)"
+            echo "  enhanced - Basic + caches, browser data, session artifacts (<0.025s)"
+            echo "  nuclear  - Enhanced + models*, state, deep session cleanup (<0.050s)"
+            echo "  forensic - Nuclear + secure deletion, metadata scrubbing (<0.100s)"
+            echo "  dry-run  - Preview enhanced mode without changes"
+            echo ""
+            echo "Privacy-Sensitive Targets:"
+            echo "  • Shell history, logs, browser data, session configs"
+            echo "  • Cache directories, temp files, authentication artifacts"
+            echo "  • Process state, metadata, journal entries (forensic mode)"
+            echo ""
+            echo "Environment Variables:"
+            echo "  IEC_DELETE_MODELS=1  - Allow model deletion in nuclear/forensic modes"
+            echo "  IEC_DRY_RUN=1        - Enable dry-run mode globally"
             exit 0
             ;;
         *) echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
@@ -34,13 +44,20 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Nuclear mode safety prompt
-if [[ "$MODE" == "nuclear" && "${IEC_DRY_RUN:-0}" == "0" ]]; then
-    echo -e "${YELLOW}⚠️  Nuclear cleanup will delete nearly everything!${NC}"
-    echo -e "${YELLOW}This includes: outputs, uploads, temp, caches, and state${NC}"
+# Destructive mode safety prompts
+if [[ ("$MODE" == "nuclear" || "$MODE" == "forensic") && "${IEC_DRY_RUN:-0}" == "0" ]]; then
+    if [[ "$MODE" == "forensic" ]]; then
+        echo -e "${RED}🔬 FORENSIC CLEANUP: Maximum privacy protection with secure deletion!${NC}"
+        echo -e "${RED}This includes: ALL privacy data + secure deletion + metadata scrubbing${NC}"
+    else
+        echo -e "${YELLOW}☢️  NUCLEAR CLEANUP: Comprehensive privacy-aware cleanup!${NC}"
+        echo -e "${YELLOW}This includes: outputs, uploads, temp, caches, session data, and state${NC}"
+    fi
+
     if [[ "${IEC_DELETE_MODELS:-0}" == "1" ]]; then
         echo -e "${RED}⚠️  IEC_DELETE_MODELS=1: Models will also be deleted!${NC}"
     fi
+
     read -p "Continue? (y/N): " -n 1 -r
     echo
     [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0

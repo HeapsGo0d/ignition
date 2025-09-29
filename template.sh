@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.6.2-path-fix"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v2.6.2 - IEC Enhanced + PATH Fix"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, minimal privacy system, and production-ready IEC cleanup with safety features (<0.025s) - SSH ready"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.7.0-iec-redesign"  # Update with your actual Docker Hub username
+TEMPLATE_NAME="Ignition ComfyUI v2.7.0 - IEC Redesign + Signal Handling"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with comprehensive privacy-aware cleanup, supervisor signal handling, and 4-tier cleanup system (basic/enhanced/nuclear/forensic)"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"

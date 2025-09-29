@@ -358,7 +358,7 @@ PY
 }
 
 start_comfyui() {
-    log "INFO" "🎨 Starting ComfyUI..."
+    log "INFO" "🎨 Starting ComfyUI via Supervisor..."
 
     # Check if port is already in use
     if command -v ss >/dev/null 2>&1 && ss -tulpn 2>/dev/null | grep -q ":$COMFYUI_PORT "; then
@@ -366,27 +366,30 @@ start_comfyui() {
         exit 4
     fi
 
-    cd "$COMFYUI_ROOT"
+    # Export environment variables for supervisor
+    export PYBIN
+    export COMFYUI_ROOT
+    export COMFYUI_PORT
+
     log "INFO" "  • Starting with CUDA support on port $COMFYUI_PORT"
-    exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
+    log "INFO" "  • Using supervisor for signal handling and cleanup"
+    exec "$SCRIPT_DIR/supervisor.sh"
 }
 
-# Signal handlers with IEC cleanup integration
+# Legacy signal handlers (supervisor now handles signals)
+# These are kept for compatibility during startup phase
 cleanup() {
-    log "INFO" "🛑 Shutting down Ignition..."
+    log "INFO" "🛑 Shutting down Ignition (startup phase)..."
     jobs -p | xargs -r kill 2>/dev/null || true
 
-    # Run IEC cleanup on exit if enabled
-    if [[ "${IEC_MODE_ON_EXIT:-basic}" != "off" ]]; then
-        log "INFO" "🧹 Running IEC cleanup mode: ${IEC_MODE_ON_EXIT}"
-        timeout 30s "$SCRIPT_DIR/ignition-cleanup-simple" "${IEC_MODE_ON_EXIT}" 2>/dev/null || {
-            log "WARN" "IEC cleanup timed out or failed during shutdown"
-        }
-    fi
+    # Note: IEC cleanup now handled by supervisor during runtime
+    log "INFO" "ℹ️ Runtime cleanup will be handled by supervisor"
 
     exit 0
 }
 
+# Install signal handlers for startup phase only
+# Supervisor takes over signal handling after exec
 trap cleanup SIGTERM SIGINT
 
 # Main execution
