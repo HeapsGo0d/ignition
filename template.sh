@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.6.1-iec-enhanced"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v2.6.1 - IEC Enhanced"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, minimal privacy system, and production-ready IEC cleanup with safety features (<0.025s)"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.6.2-path-fix"  # Update with your actual Docker Hub username
+TEMPLATE_NAME="Ignition ComfyUI v2.6.2 - IEC Enhanced + PATH Fix"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, minimal privacy system, and production-ready IEC cleanup with safety features (<0.025s) - SSH ready"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
@@ -111,13 +111,16 @@ get_configuration() {
     
     # Version input (easy mode)
     echo -e "${BLUE}Version:${NC}"
-    read -p "Enter version tag (e.g., v1.0.12) [v2.6.1-iec-enhanced]: " version_input
-    VERSION_TAG=${version_input:-v2.6.1-iec-enhanced}
+    read -p "Enter version tag (e.g., v1.0.12) [v2.6.2-path-fix]: " version_input
+    VERSION_TAG=${version_input:-v2.6.2-path-fix}
     
     # Auto-generate image and template names based on version
     if [[ "$VERSION_TAG" == "latest" ]]; then
         DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"
         TEMPLATE_NAME="Ignition ComfyUI Latest"
+    elif [[ "$VERSION_TAG" == "v2.6.2-path-fix" ]]; then
+        DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG"
+        TEMPLATE_NAME="Ignition ComfyUI v2.6.2 - IEC Enhanced + PATH Fix"
     elif [[ "$VERSION_TAG" == "v2.6.1-iec-enhanced" ]]; then
         DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG"
         TEMPLATE_NAME="Ignition ComfyUI v2.6.1 - IEC Enhanced"
