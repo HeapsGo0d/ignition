@@ -318,8 +318,18 @@ generate_template() {
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "IEC_MODE_ON_EXIT",
+      "value": "basic",
+      "description": "Cleanup mode on container exit (basic|enhanced|nuclear|off)"
+    },
+    {
+      "key": "IEC_DELETE_MODELS",
+      "value": "0",
+      "description": "Allow model deletion in nuclear cleanup (0/1)"
     }
   ],$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo '
   "securityContext": {
@@ -536,7 +546,9 @@ deploy_template() {
     {"key": "STRICT_MODE", "value": "$STRICT_MODE"},
     {"key": "PRIVACY_BYPASS", "value": "0"},
     {"key": "PRIV_ALLOW_UPDATES", "value": "$PRIV_ALLOW_UPDATES"},
-    {"key": "PROXY_PORT", "value": "8888"}
+    {"key": "PROXY_PORT", "value": "8888"},
+    {"key": "IEC_MODE_ON_EXIT", "value": "basic"},
+    {"key": "IEC_DELETE_MODELS", "value": "0"}
   ]$(if [[ "$REQUEST_NET_ADMIN" == "true" ]]; then echo ',
   "securityContext": {
     "capabilities": {

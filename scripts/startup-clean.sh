@@ -65,6 +65,10 @@ export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
 export PRIVACY_ENABLED="${PRIVACY_ENABLED:-true}"
 
+# IEC Simple System Configuration
+export IEC_MODE_ON_EXIT="${IEC_MODE_ON_EXIT:-basic}"
+export IEC_DELETE_MODELS="${IEC_DELETE_MODELS:-0}"
+
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
@@ -84,6 +88,17 @@ print_config() {
     log "INFO" "  • ComfyUI Port: $COMFYUI_PORT"
     log "INFO" "  • File Browser Port: $FILEBROWSER_PORT"
     log "INFO" "  • Privacy Protection: ${PRIVACY_ENABLED}"
+    log "INFO" ""
+    log "INFO" "🧹 Cleanup Configuration:"
+    log "INFO" "  • On-Exit Cleanup: ${IEC_MODE_ON_EXIT}"
+    if [[ "${IEC_MODE_ON_EXIT}" == "off" ]]; then
+        log "WARN" "  ⚠️  Automatic cleanup is DISABLED"
+    else
+        log "INFO" "  • Cleanup will run automatically on container exit"
+    fi
+    if [[ "${IEC_DELETE_MODELS}" == "1" ]]; then
+        log "WARN" "  ⚠️  Model deletion enabled (IEC_DELETE_MODELS=1)"
+    fi
     log "INFO" ""
 }
 

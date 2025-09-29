@@ -3,6 +3,12 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 MODE="basic"
 DRY_RUN=0
 TIMEOUT=30
@@ -13,17 +19,32 @@ while [[ $# -gt 0 ]]; do
         dry-run) MODE="enhanced"; DRY_RUN=1 ;;
         --timeout=*) TIMEOUT="${1#--timeout=}" ;;
         --help|-h)
+            echo -e "${GREEN}Ignition Cleanup (IEC Simple) - Ultra-fast container cleanup${NC}"
             echo "Usage: ignition-cleanup [basic|enhanced|nuclear|dry-run] [--timeout=N]"
-            echo "  basic    - Clean outputs, uploads, temp (fast)"
-            echo "  enhanced - Basic + caches (medium)"
-            echo "  nuclear  - Enhanced + models/state (slow)"
-            echo "  dry-run  - Show what would be deleted"
+            echo "Modes:"
+            echo "  basic    - Clean outputs, uploads, temp (<0.015s)"
+            echo "  enhanced - Basic + caches (<0.020s)"
+            echo "  nuclear  - Enhanced + state (use with caution)"
+            echo "  dry-run  - Preview mode"
+            echo "Environment: IEC_DELETE_MODELS=1 (allow model deletion), IEC_DRY_RUN=1"
             exit 0
             ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        *) echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
     esac
     shift
 done
+
+# Nuclear mode safety prompt
+if [[ "$MODE" == "nuclear" && "${IEC_DRY_RUN:-0}" == "0" ]]; then
+    echo -e "${YELLOW}⚠️  Nuclear cleanup will delete nearly everything!${NC}"
+    echo -e "${YELLOW}This includes: outputs, uploads, temp, caches, and state${NC}"
+    if [[ "${IEC_DELETE_MODELS:-0}" == "1" ]]; then
+        echo -e "${RED}⚠️  IEC_DELETE_MODELS=1: Models will also be deleted!${NC}"
+    fi
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
+fi
 
 export IEC_DRY_RUN="$DRY_RUN"
 export IEC_TIMEOUT_SEC="$TIMEOUT"

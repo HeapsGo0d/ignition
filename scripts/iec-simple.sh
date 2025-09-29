@@ -13,35 +13,58 @@ cleanup_basic() {
         echo "  [DRY] Would delete: outputs, uploads, tmp"
         return 0
     fi
-    rm -rf "$IEC_DATA_ROOT/outputs"/* 2>/dev/null || true
-    rm -rf "$IEC_DATA_ROOT/uploads"/* 2>/dev/null || true
-    rm -rf "$IEC_TMP"/* 2>/dev/null || true
+    local space_before=$(df -k /workspace 2>/dev/null | awk 'NR==2 {print $3}' || echo "0")
+    local errors=0
+    rm -rf "$IEC_DATA_ROOT/outputs"/* 2>/dev/null || ((errors++))
+    rm -rf "$IEC_DATA_ROOT/uploads"/* 2>/dev/null || ((errors++))
+    rm -rf "$IEC_TMP"/* 2>/dev/null || ((errors++))
+    local space_after=$(df -k /workspace 2>/dev/null | awk 'NR==2 {print $3}' || echo "0")
+    local freed=$((space_before - space_after))
+    local freed_mb=$((freed / 1024))
     local duration=$(($(date +%s) - start))
-    echo "✅ Basic cleanup complete in ${duration}s"
+    if [[ $errors -gt 0 ]]; then
+        echo "⚠️  Basic cleanup completed with $errors errors in ${duration}s"
+        return 1
+    fi
+    echo "✅ Basic cleanup complete in ${duration}s (freed ${freed_mb}MB)"
 }
 cleanup_enhanced() {
     echo "🧹 Enhanced cleanup: basic + caches"
-    cleanup_basic
+    local basic_result=0
+    cleanup_basic || basic_result=$?
     if [[ "${IEC_DRY_RUN:-0}" == "1" ]]; then
         echo "  [DRY] Would also delete: caches"
         return 0
     fi
-    rm -rf "$IEC_DATA_ROOT/cache"/* 2>/dev/null || true
-    rm -rf /tmp/pip-* /root/.cache/pip ~/.cache/pip 2>/dev/null || true
+    local errors=0
+    rm -rf "$IEC_DATA_ROOT/cache"/* 2>/dev/null || ((errors++))
+    rm -rf /tmp/pip-* /root/.cache/pip ~/.cache/pip 2>/dev/null || ((errors++))
+    if [[ $errors -gt 0 || $basic_result -ne 0 ]]; then
+        echo "⚠️  Enhanced cleanup completed with issues"
+        return 1
+    fi
     echo "✅ Enhanced cleanup complete"
 }
 cleanup_nuclear() {
     echo "☢️  Nuclear cleanup: EVERYTHING"
-    cleanup_enhanced
+    local enhanced_result=0
+    cleanup_enhanced || enhanced_result=$?
     if [[ "${IEC_DRY_RUN:-0}" == "1" ]]; then
         echo "  [DRY] Would also delete: models, state"
         return 0
     fi
-    if [[ "${CLEANUP_DELETE_MODELS:-0}" == "1" ]]; then
-        rm -rf "$IEC_MODELS"/* 2>/dev/null || true
+    local errors=0
+    if [[ "${IEC_DELETE_MODELS:-0}" == "1" ]]; then
+        rm -rf "$IEC_MODELS"/* 2>/dev/null || ((errors++))
         echo "⚠️  Models deleted"
+    else
+        echo "ℹ️  Models preserved (set IEC_DELETE_MODELS=1 to delete)"
     fi
-    rm -rf "$IEC_DATA_ROOT/state"/* 2>/dev/null || true
+    rm -rf "$IEC_DATA_ROOT/state"/* 2>/dev/null || ((errors++))
+    if [[ $errors -gt 0 || $enhanced_result -ne 0 ]]; then
+        echo "⚠️  Nuclear cleanup completed with issues"
+        return 1
+    fi
     echo "✅ Nuclear cleanup complete"
 }
 run_with_timeout() {
