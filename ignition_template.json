@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v2.5.7-trap-fix-rebuild",
+  "name": "Ignition ComfyUI v2.5.8-escape-fix",
   "description": "Dynamic ComfyUI with runtime model downloads, Intelligent Ephemeral Cleanup (IEC) system, minimal privacy controls, and performance optimizations",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v2.5.7-trap-fix-rebuild",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v2.5.8-escape-fix",
   "ports": [
     {
       "privatePort": 8188,
