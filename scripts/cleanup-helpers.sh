@@ -848,13 +848,9 @@ is_ssh_environment() {
 
 # Get the main script process PID (not shell PID)
 get_script_pid() {
-    if is_ssh_environment; then
-        # In SSH environment, use current bash PID to avoid affecting SSH session
-        echo "$BASHPID"
-    else
-        # In local environment, use shell PID
-        echo "$$"
-    fi
+    # Always use BASHPID for the current shell process
+    # This avoids issues with subprocess vs parent process confusion
+    echo "$BASHPID"
 }
 
 # Timeout handling
@@ -869,7 +865,7 @@ setup_timeout() {
             # Use file-based timeout mechanism to avoid SSH session interference
             local timeout_flag="/tmp/iec-timeout-$$-$RANDOM"
             # Install trap BEFORE starting background process to avoid race condition
-            trap "$cleanup_func \$timeout_pid $timeout_flag" USR1
+            trap "cleanup_timeout_ssh '$timeout_flag'" USR1
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
@@ -882,7 +878,7 @@ setup_timeout() {
         else
             log "DEBUG" "Local environment - using standard timeout: ${timeout_sec}s"
             # Install trap BEFORE starting background process to avoid race condition
-            trap "$cleanup_func \$timeout_pid" USR1
+            trap "cleanup_timeout_local" USR1
             (
                 sleep "$timeout_sec"
                 log "WARN" "Cleanup timeout reached (${timeout_sec}s), stopping"
@@ -894,14 +890,47 @@ setup_timeout() {
     fi
 }
 
+# SSH environment timeout cleanup
+cleanup_timeout_ssh() {
+    local timeout_flag="$1"
+
+    log "WARN" "Cleanup stopped due to timeout budget"
+
+    # Find and kill timeout process by flag file
+    if [[ -n "$timeout_flag" && -f "$timeout_flag" ]]; then
+        # Find sleep processes that might be our timeout process
+        pkill -f "sleep.*$(basename "$timeout_flag")" 2>/dev/null || true
+        rm -f "$timeout_flag" 2>/dev/null || true
+    fi
+
+    # Use specific exit code for timeout
+    exit 124  # timeout exit code
+}
+
+# Local environment timeout cleanup
+cleanup_timeout_local() {
+    log "WARN" "Cleanup stopped due to timeout budget"
+
+    # Find and kill sleep processes related to our script
+    pkill -P $$ -f "sleep.*" 2>/dev/null || true
+
+    # Use specific exit code for timeout
+    exit 124  # timeout exit code
+}
+
+# Legacy cleanup function for backward compatibility
 cleanup_timeout() {
     local timeout_pid="$1"
     local timeout_flag="$2"
 
     log "WARN" "Cleanup stopped due to timeout budget"
 
-    # Clean up timeout process
-    kill "$timeout_pid" 2>/dev/null || true
+    # Validate PID before killing
+    if [[ -n "$timeout_pid" && "$timeout_pid" =~ ^[0-9]+$ ]]; then
+        kill "$timeout_pid" 2>/dev/null || true
+    else
+        log "DEBUG" "Invalid timeout_pid for cleanup: '$timeout_pid'"
+    fi
 
     # Clean up timeout flag file if it exists
     [[ -n "$timeout_flag" && -f "$timeout_flag" ]] && rm -f "$timeout_flag" 2>/dev/null || true
