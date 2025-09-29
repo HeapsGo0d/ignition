@@ -16,8 +16,13 @@ export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
 export HUGGINGFACE_HUB_CACHE="${HUGGINGFACE_HUB_CACHE:-$HF_HOME}"
 mkdir -p "$HF_HOME" || true
 
-# Add scripts to PATH
+# Add scripts to PATH for current session
 export PATH="/workspace/scripts:$PATH"
+
+# Make PATH persistent for SSH sessions
+if ! grep -q "/workspace/scripts" /root/.bashrc 2>/dev/null; then
+    echo 'export PATH="/workspace/scripts:$PATH"' >> /root/.bashrc
+fi
 
 # Python interpreter
 PYBIN="$(command -v python3 || command -v python)"
