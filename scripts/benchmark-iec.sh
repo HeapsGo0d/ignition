@@ -66,7 +66,7 @@ create_test_files() {
     for i in $(seq 1 $count); do
         echo "output data $i" > "$base_dir/outputs/output_$i.png"
         echo "upload data $i" > "$base_dir/uploads/upload_$i.txt"
-        echo "temp data $i" > "$base_dir/tmp/temp_$i.tmp"
+        echo "temp data $i" > "$BENCHMARK_WORKSPACE/tmp/temp_$i.tmp"
     done
 
     # Create cache files
