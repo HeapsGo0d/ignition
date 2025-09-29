@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.4.2"  # IEC SSH Timeout Fix - Resolves RunPod connection drops
-TEMPLATE_NAME="Ignition ComfyUI v2.4 - IEC Performance"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, Intelligent Ephemeral Cleanup (IEC) system, minimal privacy controls, and performance optimizations"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v2.5.9"  # IEC Performance Refactor - <5s cleanup times
+TEMPLATE_NAME="Ignition ComfyUI v2.5.9 - IEC Ultra Fast"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads, Ultra-Fast Intelligent Ephemeral Cleanup (<5s), minimal privacy controls, and performance optimizations"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"

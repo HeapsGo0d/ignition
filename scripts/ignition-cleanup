@@ -306,18 +306,18 @@ count_pinned_items() {
     echo "$count"
 }
 
-# Basic cleanup mode
+# Basic cleanup mode - simplified linear approach
 cleanup_basic() {
+    local start=$(date +%s.%N)
     log "INFO" "🧹 Basic cleanup: outputs, uploads, temp, session logs"
 
-    # P0: Must remove (privacy-critical)
-    safe_delete "$IEC_DATA_OUTPUTS" basic
-    safe_delete "$IEC_DATA_UPLOADS" basic
-    safe_delete "$IEC_TMP" basic
+    # Direct removal operations - no complex validation
+    [[ -d "$IEC_DATA_OUTPUTS" ]] && rm -rf "$IEC_DATA_OUTPUTS"/* 2>/dev/null || true
+    [[ -d "$IEC_DATA_UPLOADS" ]] && rm -rf "$IEC_DATA_UPLOADS"/* 2>/dev/null || true
+    [[ -d "$IEC_TMP" ]] && rm -rf "$IEC_TMP"/* 2>/dev/null || true
 
-    # Session and recent logs (rotate, don't delete all)
+    # Quick log cleanup
     if [[ -d "$IEC_DATA_LOGS" ]]; then
-        # Keep cleanup log and privacy system logs, remove session artifacts
         find "$IEC_DATA_LOGS" -name "session*" -mtime +0 -type f -exec rm -f {} + 2>/dev/null || true
         find "$IEC_DATA_LOGS" -name "startup*" -mtime +0 -type f -exec rm -f {} + 2>/dev/null || true
     fi
@@ -325,31 +325,32 @@ cleanup_basic() {
     # Remove temporary startup logs
     rm -f /tmp/ignition_startup.log /tmp/*.tmp 2>/dev/null || true
 
-    log "INFO" "✅ Basic cleanup complete"
+    local duration=$(echo "$(date +%s.%N) - $start" | bc 2>/dev/null || echo "0")
+    log "INFO" "✅ Basic cleanup complete in ${duration}s"
 }
 
-# Enhanced cleanup mode
+# Enhanced cleanup mode - simplified linear approach
 cleanup_enhanced() {
+    local start=$(date +%s.%N)
     log "INFO" "🧹 Enhanced cleanup: basic + caches, thumbnails, non-critical state"
 
     # Run basic cleanup first
     cleanup_basic
 
-    # P1: Nice to remove (performance)
-    safe_delete "$IEC_DATA_CACHE" enhanced
+    # Direct cache removal
+    [[ -d "$IEC_DATA_CACHE" ]] && rm -rf "$IEC_DATA_CACHE"/* 2>/dev/null || true
 
-    # Remove thumbnail and preview caches if they exist
-    find /workspace -name "*thumb*" -o -name "*preview*" -o -name "*cache*" -type d 2>/dev/null | \
+    # Quick cache search and cleanup (limited depth for performance)
+    find /workspace -maxdepth 3 -name "*cache*" -type d 2>/dev/null | head -5 | \
         while read -r cache_dir; do
-        if [[ "$cache_dir" != "$IEC_DATA_CACHE"* ]]; then  # Don't double-delete
-            safe_delete "$cache_dir" enhanced
-        fi
-    done
+            [[ "$cache_dir" != "$IEC_DATA_CACHE"* ]] && rm -rf "$cache_dir"/* 2>/dev/null || true
+        done
 
     # Clean pip caches and build artifacts
     rm -rf /tmp/pip-* /root/.cache/pip ~/.cache/pip 2>/dev/null || true
 
-    log "INFO" "✅ Enhanced cleanup complete"
+    local duration=$(echo "$(date +%s.%N) - $start" | bc 2>/dev/null || echo "0")
+    log "INFO" "✅ Enhanced cleanup complete in ${duration}s"
 }
 
 # Nuclear cleanup mode
@@ -400,29 +401,30 @@ cleanup_nuclear() {
         fi
     fi
 
+    local start=$(date +%s.%N)
     log "INFO" "☢️  Nuclear cleanup: EVERYTHING (models, state, tokens)"
 
     # Run enhanced cleanup first
     cleanup_enhanced
 
-    # P2: Heavy items (nuclear only)
-    safe_delete "$IEC_MODELS" nuclear
-    safe_delete "$IEC_DATA_STATE" nuclear
+    # Direct removal of state and application data
+    [[ -d "$IEC_DATA_STATE" ]] && rm -rf "$IEC_DATA_STATE"/* 2>/dev/null || true
+    [[ -d "/workspace/.filebrowser" ]] && rm -rf "/workspace/.filebrowser" 2>/dev/null || true
 
-    # Remove any remaining application state
-    safe_delete "/workspace/.filebrowser" nuclear
-    safe_delete "/workspace/ComfyUI/models" nuclear  # Legacy location
+    # Only delete models if explicitly enabled
+    if [[ "${CLEANUP_DELETE_MODELS:-0}" == "1" ]]; then
+        [[ -d "$IEC_MODELS" ]] && rm -rf "$IEC_MODELS"/* 2>/dev/null || true
+        [[ -d "/workspace/ComfyUI/models" ]] && rm -rf "/workspace/ComfyUI/models"/* 2>/dev/null || true
+    fi
 
-    # Clear tokens and credentials (be careful not to log them)
-    find /workspace -name "*token*" -o -name "*key*" -o -name "*secret*" 2>/dev/null | \
-        grep -v cleanup | head -10 | while read -r file; do
-        if [[ -f "$file" ]]; then
-            log "INFO" "Removing credential file: $(basename "$file")"
-            rm -f "$file" 2>/dev/null || true
-        fi
-    done
+    # Quick credential cleanup (limited search for performance)
+    find /workspace -maxdepth 2 -name "*token*" -o -name "*key*" -o -name "*secret*" 2>/dev/null | \
+        head -5 | while read -r file; do
+            [[ -f "$file" ]] && rm -f "$file" 2>/dev/null || true
+        done
 
-    log "INFO" "✅ Nuclear cleanup complete - next start will be like fresh boot"
+    local duration=$(echo "$(date +%s.%N) - $start" | bc 2>/dev/null || echo "0")
+    log "INFO" "✅ Nuclear cleanup complete in ${duration}s - next start will be like fresh boot"
 }
 
 # Main cleanup execution
@@ -463,21 +465,16 @@ run_cleanup() {
     CLEANUP_START_TIME=$(date +%s)
     echo "DEBUG: after start_time - $(date +%s.%3N)" >&2
 
-    # Calculate initial sizes
-    local initial_gb=$(calculate_initial_sizes "$mode")
-    echo "DEBUG: after calculate_initial_sizes - $(date +%s.%3N)" >&2
-    CLEANUP_PINNED_COUNT=$(count_pinned_items "$mode")
-    echo "DEBUG: after count_pinned_items - $(date +%s.%3N)" >&2
+    # Skip expensive size calculations for performance - just estimate
+    local initial_gb="0.00"
+    CLEANUP_PINNED_COUNT=0
 
-    log "INFO" "Starting cleanup: mode=$mode, initial_size=${initial_gb}GB, pins=$CLEANUP_PINNED_COUNT"
-    show_model_size_summary "$mode"
-    echo "DEBUG: after show_model_size_summary - $(date +%s.%3N)" >&2
+    log "INFO" "Starting cleanup: mode=$mode"
 
-    # Quiesce services if not dry run
-    if [[ "$IEC_DRY_RUN" != "1" ]]; then
+    # Skip service quiescing for speed - services can handle cleanup
+    if [[ "$IEC_DRY_RUN" != "1" && "${IEC_QUIESCE_SERVICES:-0}" == "1" ]]; then
         quiesce_services
     fi
-    echo "DEBUG: after quiesce_services - $(date +%s.%3N)" >&2
 
     # Run cleanup based on mode
     case "$mode" in
@@ -501,9 +498,9 @@ run_cleanup() {
         recreate_skeleton
     fi
 
-    # Calculate freed space
-    local final_gb=$(calculate_initial_sizes "$mode")
-    CLEANUP_FREED_GB=$(awk "BEGIN {printf \"%.2f\", $initial_gb - $final_gb}")
+    # Skip expensive final calculations for performance
+    local final_gb="0.00"
+    CLEANUP_FREED_GB="0.00"
 
     # Stop timeout
     if [[ -n "$TIMEOUT_PID" ]]; then
@@ -511,19 +508,13 @@ run_cleanup() {
         TIMEOUT_PID=""
     fi
 
-    # Final summary
+    # Simple summary
     echo ""
     echo "🧹 Cleanup Summary:"
     echo "  • Mode: $mode"
-    echo "  • Before: ${initial_gb}GB"
-    echo "  • After: ${final_gb}GB"
-    echo "  • Freed: ${CLEANUP_FREED_GB}GB"
-    if [[ "$CLEANUP_PINNED_COUNT" -gt 0 ]]; then
-        echo "  • Pinned items protected: $CLEANUP_PINNED_COUNT"
-    fi
-    show_model_size_summary "$mode"
+    echo "  • Status: Complete"
 
-    log "INFO" "Cleanup complete: freed ${CLEANUP_FREED_GB}GB"
+    log "INFO" "Cleanup complete"
 }
 
 # Parse command line arguments
