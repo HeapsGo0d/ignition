@@ -351,10 +351,19 @@ start_comfyui() {
     exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
 }
 
-# Signal handlers
+# Signal handlers with IEC cleanup integration
 cleanup() {
     log "INFO" "🛑 Shutting down Ignition..."
     jobs -p | xargs -r kill 2>/dev/null || true
+
+    # Run IEC cleanup on exit if enabled
+    if [[ "${IEC_MODE_ON_EXIT:-basic}" != "off" ]]; then
+        log "INFO" "🧹 Running IEC cleanup mode: ${IEC_MODE_ON_EXIT}"
+        timeout 30s "$SCRIPT_DIR/ignition-cleanup-simple" "${IEC_MODE_ON_EXIT}" 2>/dev/null || {
+            log "WARN" "IEC cleanup timed out or failed during shutdown"
+        }
+    fi
+
     exit 0
 }
 

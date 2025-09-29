@@ -1,0 +1,30 @@
+#!/bin/bash
+# Simple CLI wrapper for IEC cleanup
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+MODE="basic"
+DRY_RUN=0
+TIMEOUT=30
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        basic|enhanced|nuclear) MODE="$1" ;;
+        dry-run) MODE="enhanced"; DRY_RUN=1 ;;
+        --timeout=*) TIMEOUT="${1#--timeout=}" ;;
+        --help|-h)
+            echo "Usage: ignition-cleanup [basic|enhanced|nuclear|dry-run] [--timeout=N]"
+            echo "  basic    - Clean outputs, uploads, temp (fast)"
+            echo "  enhanced - Basic + caches (medium)"
+            echo "  nuclear  - Enhanced + models/state (slow)"
+            echo "  dry-run  - Show what would be deleted"
+            exit 0
+            ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+export IEC_DRY_RUN="$DRY_RUN"
+export IEC_TIMEOUT_SEC="$TIMEOUT"
+exec "$SCRIPT_DIR/iec-simple.sh" "$MODE"
