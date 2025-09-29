@@ -1,5 +1,5 @@
 {
-  "name": "Ignition ComfyUI v2.7.0 - IEC Redesign + Signal Handling",
+  "name": "Ignition ComfyUI v2.7.0-iec-redesign",
   "description": "Dynamic ComfyUI with comprehensive privacy-aware cleanup, supervisor signal handling, and 4-tier cleanup system (basic/enhanced/nuclear/forensic)",
   "dockerImage": "heapsgo0d/ignition-comfyui:v2.7.0-iec-redesign",
   "ports": [
