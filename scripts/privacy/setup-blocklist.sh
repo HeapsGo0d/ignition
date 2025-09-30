@@ -50,11 +50,16 @@ BLOCKLIST=(
 
 # Add blocklist entries (IPv4 + IPv6)
 for domain in "${BLOCKLIST[@]}"; do
-    # Check if already blocked
+    # Check IPv4 separately
     if ! grep -q "127.0.0.1 $domain" /etc/hosts 2>/dev/null; then
         echo "127.0.0.1 $domain" >> /etc/hosts
+        echo "  • Added IPv4: $domain"
+    fi
+
+    # Check IPv6 separately (ensures upgrades work)
+    if ! grep -q "::1 $domain" /etc/hosts 2>/dev/null; then
         echo "::1 $domain" >> /etc/hosts
-        echo "  • Blocked: $domain (IPv4 + IPv6)"
+        echo "  • Added IPv6: $domain"
     fi
 done
 
