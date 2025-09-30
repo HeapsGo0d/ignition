@@ -19,6 +19,9 @@ mkdir -p "$HF_HOME" || true
 # Consistent Python interpreter
 PYBIN="$(command -v python3 || command -v python)"
 
+# Track if ComfyUI successfully started (for nuke on clean shutdown only)
+COMFYUI_STARTED=false
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -231,17 +234,40 @@ start_comfyui() {
 
     cd "$COMFYUI_ROOT"
     log "INFO" "  • Starting with CUDA support"
-    exec "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT"
+
+    # Start ComfyUI in background instead of exec (allows trap to work)
+    "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT" &
+    COMFYUI_PID=$!
+
+    # Mark as successfully started (enables nuke on clean shutdown)
+    COMFYUI_STARTED=true
+
+    # Wait for ComfyUI to exit
+    wait $COMFYUI_PID
 }
 
 # Signal handlers
 cleanup() {
     log "INFO" "🛑 Shutting down Ignition..."
+
+    # Kill background processes (File Browser, etc.)
     jobs -p | xargs -r kill 2>/dev/null || true
+
+    # Run nuclear cleanup only if ComfyUI successfully started
+    if [[ "$COMFYUI_STARTED" == "true" ]]; then
+        log "INFO" "🔥 Running nuclear cleanup..."
+        /usr/local/bin/nuke
+    else
+        log "INFO" "⏭️  Skipping nuke (ComfyUI did not start successfully)"
+    fi
+}
+
+trap_handler() {
+    cleanup
     exit 0
 }
 
-trap cleanup SIGTERM SIGINT
+trap trap_handler EXIT SIGTERM SIGINT
 
 # Main execution
 main() {
