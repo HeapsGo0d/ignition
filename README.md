@@ -164,6 +164,24 @@ COMFYUI_PORT="3000"
 FILEBROWSER_PORT="3001"
 ```
 
+### 🔒 Privacy Lite
+
+Ignition includes basic privacy protection for telemetry blocking and connection monitoring.
+
+**Features**:
+- **Telemetry Blocklist**: Blocks known analytics/tracking domains (CivitAI, Stability AI, Google Analytics, etc.) via `/etc/hosts`
+- **Connection Monitoring**: Logs external connections every 2 minutes to `/tmp/ignition-connections.log`
+- **IPv4 + IPv6 Protection**: Blocks both protocols to prevent bypass
+- **Graceful Degradation**: Continues if `/etc/hosts` is read-only
+
+**View Connection Log**:
+```bash
+# SSH into your pod
+/workspace/scripts/privacy/show-connections.sh
+```
+
+**Automatic Setup**: Privacy protection activates automatically on container start before any model downloads occur.
+
 ### 💣 Nuclear Cleanup (Nuke)
 
 Ignition includes a nuclear cleanup feature that **deletes all user data and models** for a fresh start.
