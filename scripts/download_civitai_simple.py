@@ -58,48 +58,61 @@ def get_model_info(model_id: str, token: str = "") -> Dict[str, any]:
         return {}
 
 def generate_filename(model_id: str, token: str = "") -> str:
-    """Generate hybrid filename with model name and ID."""
+    """Generate hybrid filename with model name and ID, using actual file extension from API."""
     model_info = get_model_info(model_id, token)
-    
+
+    # Default extension
+    extension = ".safetensors"
+
+    # Try to get actual extension from API response
+    if model_info and 'files' in model_info and len(model_info['files']) > 0:
+        actual_filename = model_info['files'][0].get('name', '')
+        if actual_filename:
+            # Extract extension from actual filename (e.g., "model.ckpt" → ".ckpt")
+            import os
+            _, ext = os.path.splitext(actual_filename)
+            if ext:  # Use actual extension if found
+                extension = ext
+
     if model_info and 'name' in model_info.get('model', {}):
         model_name = model_info['model']['name']
         clean_name = clean_filename(model_name, max_length=30)
-        return f"{clean_name}_{model_id}.safetensors"
+        return f"{clean_name}_{model_id}{extension}"
     else:
         # Fallback to ID-only naming
-        return f"model_{model_id}.safetensors"
+        return f"model_{model_id}{extension}"
 
 
 def download_civitai_model(model_id: str, output_dir: Path, token: str = "", filename: str = "", force: bool = False) -> bool:
     """Download a CivitAI model with fallback strategies."""
 
-    # Try SafeTensor format first
-    params: Dict[str, str] = {'type': 'Model', 'format': 'SafeTensor'}
-    if token:
-        params['token'] = token
-
-    safetensor_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
-
-    # Generate filename if not provided
+    # Generate filename if not provided (includes correct extension from API)
     if not filename:
         filename = generate_filename(model_id, token)
-    elif not filename.endswith('.safetensors'):
-        filename += '.safetensors'
 
-    log('info', f'Attempting SafeTensor download for model {model_id}')
-    if download_with_aria2(safetensor_url, output_dir, filename, token="", force=force):
-        return True
+    # Try SafeTensor format first (if filename suggests safetensors)
+    if filename.endswith('.safetensors'):
+        params: Dict[str, str] = {'type': 'Model', 'format': 'SafeTensor'}
+        if token:
+            params['token'] = token
 
-    # Fallback to any available format
-    log('warning', 'SafeTensor failed, trying default format...')
+        safetensor_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
+
+        log('info', f'Attempting SafeTensor download for model {model_id}')
+        if download_with_aria2(safetensor_url, output_dir, filename, token="", force=force):
+            return True
+
+        log('warning', 'SafeTensor format failed, trying default format...')
+
+    # Try default format (respects whatever API serves)
     params = {'type': 'Model'}
     if token:
         params['token'] = token
 
-    fallback_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
-    fallback_filename = f"model_{model_id}.ckpt" if not filename.endswith(('.safetensors', '.ckpt', '.pt')) else filename
+    default_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
 
-    if download_with_aria2(fallback_url, output_dir, fallback_filename, token="", force=force):
+    log('info', f'Attempting default format download for model {model_id}')
+    if download_with_aria2(default_url, output_dir, filename, token="", force=force):
         return True
 
     log('error', f'All download attempts failed for model {model_id}')

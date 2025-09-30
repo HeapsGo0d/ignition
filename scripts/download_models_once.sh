@@ -176,11 +176,12 @@ download_models() {
             log "INFO" "$SUCCESS All downloads completed successfully"
             return 0
         elif [[ $success_count -gt 0 ]]; then
-            log "INFO" "$WARNING Partial success: $success_count/$total_processes downloads completed"
-            return 0  # Consider partial success as overall success
+            log "WARN" "$WARNING Partial success: $success_count/$total_processes providers completed"
+            log "WARN" "Some downloads failed, but starting ComfyUI with available models"
+            return 0  # Graceful degradation - start with what works
         else
-            log "ERROR" "$ERROR All downloads failed"
-            return 1
+            log "ERROR" "$ERROR All download providers failed - cannot continue"
+            return 1  # Fatal only when everything fails
         fi
     else
         log "INFO" "$SUCCESS No downloads needed - models already present"
