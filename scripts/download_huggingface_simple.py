@@ -88,16 +88,16 @@ def parse_generic_repo(model_input: str) -> Optional[Dict[str, str]]:
         'subdir': subdir
     }
 
-def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") -> bool:
+def download_flux_model(model_key: str, base_output_dir: Path, token: str = "", force: bool = False) -> bool:
     """Download a FLUX model - supports both predefined models and generic HF repos."""
-    
+
     model_info: Optional[Dict[str, str]] = None
-    
+
     # Check if it's a predefined model
     if model_key in FLUX_MODELS:
         model_info = FLUX_MODELS[model_key]
         log('info', f'Downloading predefined FLUX model: {model_key}')
-    
+
     # Check if it's a generic repo format (contains colons)
     elif ':' in model_key:
         model_info = parse_generic_repo(model_key)
@@ -106,22 +106,22 @@ def download_flux_model(model_key: str, base_output_dir: Path, token: str = "") 
         else:
             log('error', f'Invalid generic repo format: {model_key}. Use: repo:filename:subdir[:branch]')
             return False
-    
+
     # Unknown model
     else:
         log('error', f'Unknown FLUX model: {model_key}. Available predefined: {", ".join(FLUX_MODELS.keys())}')
         log('info', f'Or use generic format: repo:filename:subdir[:branch]')
         return False
-    
+
     url = model_info['url']
     filename = model_info['filename']
     subdir = model_info['subdir']
-    
+
     # Create the proper subdirectory
     target_dir = base_output_dir / subdir
-    
+
     log('info', f'Target directory: {subdir}/')
-    return download_with_aria2(url, target_dir, filename, token)
+    return download_with_aria2(url, target_dir, filename, token, force=force)
 
 def main() -> int:
     """Main entry point."""
@@ -135,10 +135,15 @@ def main() -> int:
     
     # Get token from environment if not provided
     token = args.token or os.getenv('HF_TOKEN', '')
-    
+
     if not token:
         log('warning', 'No HuggingFace token provided - downloads may fail for gated models')
-    
+
+    # Check for force sync flag
+    force_sync = os.getenv('FORCE_MODEL_SYNC', 'false').lower() == 'true'
+    if force_sync:
+        log('info', '🔄 FORCE_MODEL_SYNC=true - will re-download existing files')
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -165,7 +170,7 @@ def main() -> int:
     
     success_count = 0
     for model_key in all_model_keys:
-        if download_flux_model(model_key, output_dir, token):
+        if download_flux_model(model_key, output_dir, token, force=force_sync):
             success_count += 1
         else:
             log('warning', f'Failed to download model {model_key}')

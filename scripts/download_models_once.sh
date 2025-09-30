@@ -73,7 +73,7 @@ check_if_downloads_needed() {
             [[ -n "$CIVITAI_FLUX" ]] && log "INFO" "   FLUX: $CIVITAI_FLUX" >&2
 
             civitai_needed=true
-            log "INFO" "✅ CivitAI downloads will run (Python scripts handle per-model ID checking)" >&2
+            log "INFO" "✅ CivitAI downloads will run (cached models will be skipped)" >&2
         fi
 
         # Check HuggingFace downloads needed
@@ -82,7 +82,7 @@ check_if_downloads_needed() {
             log "INFO" "🤗 $hf_count HuggingFace models requested: $HUGGINGFACE_MODELS" >&2
 
             hf_needed=true
-            log "INFO" "✅ HuggingFace downloads will run (Python scripts handle per-model ID checking)" >&2
+            log "INFO" "✅ HuggingFace downloads will run (cached models will be skipped)" >&2
         fi
     fi
 

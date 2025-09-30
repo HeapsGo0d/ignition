@@ -36,7 +36,7 @@ def ensure_aria2():
         log('error', 'aria2c not found. Please install aria2.')
         return False
 
-def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = "") -> bool:
+def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = "", force: bool = False) -> bool:
     """Download file using aria2c with standardized settings."""
     if not ensure_aria2():
         return False
@@ -44,8 +44,16 @@ def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = 
     output_dir.mkdir(parents=True, exist_ok=True)
     file_path = output_dir / filename
 
-    # Remove existing file to avoid conflicts
+    # Check if file already exists (caching)
+    if file_path.exists() and not force:
+        file_size_mb = file_path.stat().st_size // (1024 * 1024)
+        if file_size_mb > 0:  # Valid cached file
+            log('info', f'✓ Cached: {filename} ({file_size_mb}MB)')
+            return True
+
+    # Remove existing file only when force=True or file is invalid
     if file_path.exists():
+        log('info', f'Removing existing file: {filename} (force={force})')
         file_path.unlink()
 
     cmd = [

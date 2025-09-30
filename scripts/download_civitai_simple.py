@@ -70,38 +70,38 @@ def generate_filename(model_id: str, token: str = "") -> str:
         return f"model_{model_id}.safetensors"
 
 
-def download_civitai_model(model_id: str, output_dir: Path, token: str = "", filename: str = "") -> bool:
+def download_civitai_model(model_id: str, output_dir: Path, token: str = "", filename: str = "", force: bool = False) -> bool:
     """Download a CivitAI model with fallback strategies."""
-    
+
     # Try SafeTensor format first
     params: Dict[str, str] = {'type': 'Model', 'format': 'SafeTensor'}
     if token:
         params['token'] = token
-    
+
     safetensor_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
-    
+
     # Generate filename if not provided
     if not filename:
         filename = generate_filename(model_id, token)
     elif not filename.endswith('.safetensors'):
         filename += '.safetensors'
-    
+
     log('info', f'Attempting SafeTensor download for model {model_id}')
-    if download_with_aria2(safetensor_url, output_dir, filename):
+    if download_with_aria2(safetensor_url, output_dir, filename, token="", force=force):
         return True
-    
+
     # Fallback to any available format
     log('warning', 'SafeTensor failed, trying default format...')
     params = {'type': 'Model'}
     if token:
         params['token'] = token
-    
+
     fallback_url = f"{CIVITAI_API_BASE}/download/models/{model_id}?{urlencode(params)}"
     fallback_filename = f"model_{model_id}.ckpt" if not filename.endswith(('.safetensors', '.ckpt', '.pt')) else filename
-    
-    if download_with_aria2(fallback_url, output_dir, fallback_filename):
+
+    if download_with_aria2(fallback_url, output_dir, fallback_filename, token="", force=force):
         return True
-    
+
     log('error', f'All download attempts failed for model {model_id}')
     return False
 
@@ -120,12 +120,17 @@ def main() -> int:
     
     # Get token from environment if not provided
     token = args.token or os.getenv('CIVITAI_TOKEN', '')
-    
+
     if not token:
         log('warning', 'No CIVITAI_TOKEN provided - downloads may fail for gated models')
     else:
         log('info', f'Using CivitAI token: {token[:8]}...')
-    
+
+    # Check for force sync flag
+    force_sync = os.getenv('FORCE_MODEL_SYNC', 'false').lower() == 'true'
+    if force_sync:
+        log('info', '🔄 FORCE_MODEL_SYNC=true - will re-download existing files')
+
     base_output_dir = Path(args.output_dir)
     
     # Parse and validate model IDs
@@ -149,37 +154,37 @@ def main() -> int:
         checkpoints_dir = base_output_dir / 'checkpoints'
         log('info', f'Downloading {len(model_ids)} models to {checkpoints_dir}')
         for model_id in model_ids:
-            if download_civitai_model(model_id, checkpoints_dir, token):
+            if download_civitai_model(model_id, checkpoints_dir, token, force=force_sync):
                 success_count += 1
             else:
                 log('warning', f'Failed to download model {model_id}')
-    
+
     # Download LoRAs to loras/
     if lora_ids:
         loras_dir = base_output_dir / 'loras'
         log('info', f'Downloading {len(lora_ids)} LoRAs to {loras_dir}')
         for lora_id in lora_ids:
-            if download_civitai_model(lora_id, loras_dir, token):
+            if download_civitai_model(lora_id, loras_dir, token, force=force_sync):
                 success_count += 1
             else:
                 log('warning', f'Failed to download LoRA {lora_id}')
-    
+
     # Download VAEs to vae/
     if vae_ids:
         vaes_dir = base_output_dir / 'vae'
         log('info', f'Downloading {len(vae_ids)} VAEs to {vaes_dir}')
         for vae_id in vae_ids:
-            if download_civitai_model(vae_id, vaes_dir, token):
+            if download_civitai_model(vae_id, vaes_dir, token, force=force_sync):
                 success_count += 1
             else:
                 log('warning', f'Failed to download VAE {vae_id}')
-    
+
     # Download FLUX models to diffusion_models/
     if flux_ids:
         flux_dir = base_output_dir / 'diffusion_models'
         log('info', f'Downloading {len(flux_ids)} FLUX models to {flux_dir}')
         for flux_id in flux_ids:
-            if download_civitai_model(flux_id, flux_dir, token):
+            if download_civitai_model(flux_id, flux_dir, token, force=force_sync):
                 success_count += 1
             else:
                 log('warning', f'Failed to download FLUX model {flux_id}')
