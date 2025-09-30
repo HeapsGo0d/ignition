@@ -125,7 +125,7 @@ setup_storage() {
 
 # Use the download_models_once.sh script for downloads
 download_models() {
-    if [[ -z "$CIVITAI_MODELS$HUGGINGFACE_MODELS" ]]; then
+    if [[ -z "$CIVITAI_MODELS$CIVITAI_LORAS$CIVITAI_VAES$CIVITAI_FLUX$HUGGINGFACE_MODELS" ]]; then
         log "INFO" "📥 No models requested; skipping downloads."
         log "INFO" ""
         return

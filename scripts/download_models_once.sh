@@ -37,18 +37,10 @@ log() {
 check_if_downloads_needed() {
     local civitai_needed=false
     local hf_needed=false
-    
+
     log "INFO" "🔍 Checking if model downloads are needed..." >&2
     log "INFO" "Models directory: $COMFYUI_MODELS_DIR" >&2
-    
-    # Count existing model files
-    local model_count=0
-    if [[ -d "$COMFYUI_MODELS_DIR" ]]; then
-        model_count=$(find "$COMFYUI_MODELS_DIR" -name "*.safetensors" -o -name "*.ckpt" -o -name "*.pt" -o -name "*.bin" 2>/dev/null | wc -l)
-    fi
-    
-    log "INFO" "Found $model_count existing model files" >&2
-    
+
     # Check FORCE_MODEL_SYNC first
     if [[ "${FORCE_MODEL_SYNC}" == "true" ]]; then
         log "INFO" "🔄 FORCE_MODEL_SYNC=true - forcing all downloads" >&2
@@ -73,37 +65,29 @@ check_if_downloads_needed() {
             if [[ -n "$CIVITAI_FLUX" ]]; then
                 flux_count=$(echo "$CIVITAI_FLUX" | tr ',' '\n' | wc -l)
             fi
-            
+
             log "INFO" "📥 CivitAI requested: $civitai_count models, $lora_count LoRAs, $vae_count VAEs, $flux_count FLUX" >&2
             [[ -n "$CIVITAI_MODELS" ]] && log "INFO" "   Models: $CIVITAI_MODELS" >&2
             [[ -n "$CIVITAI_LORAS" ]] && log "INFO" "   LoRAs: $CIVITAI_LORAS" >&2
             [[ -n "$CIVITAI_VAES" ]] && log "INFO" "   VAEs: $CIVITAI_VAES" >&2
             [[ -n "$CIVITAI_FLUX" ]] && log "INFO" "   FLUX: $CIVITAI_FLUX" >&2
-            
-            if [[ $model_count -eq 0 ]]; then
-                civitai_needed=true
-                log "INFO" "✅ CivitAI downloads needed (no models found)" >&2
-            else
-                log "INFO" "⏭️ CivitAI downloads skipped ($model_count models present)" >&2
-            fi
+
+            civitai_needed=true
+            log "INFO" "✅ CivitAI downloads will run (Python scripts handle per-model ID checking)" >&2
         fi
-        
-        # Check HuggingFace downloads needed  
+
+        # Check HuggingFace downloads needed
         if [[ -n "$HUGGINGFACE_MODELS" ]]; then
             local hf_count=$(echo "$HUGGINGFACE_MODELS" | tr ',' '\n' | wc -l)
             log "INFO" "🤗 $hf_count HuggingFace models requested: $HUGGINGFACE_MODELS" >&2
-            
-            if [[ $model_count -eq 0 ]]; then
-                hf_needed=true
-                log "INFO" "✅ HuggingFace downloads needed (no models found)" >&2
-            else
-                log "INFO" "⏭️ HuggingFace downloads skipped ($model_count models present)" >&2
-            fi
+
+            hf_needed=true
+            log "INFO" "✅ HuggingFace downloads will run (Python scripts handle per-model ID checking)" >&2
         fi
     fi
-    
+
     log "INFO" "📋 Download decision: CivitAI=$civitai_needed, HuggingFace=$hf_needed" >&2
-    
+
     # Return ONLY the decision to stdout
     echo "$civitai_needed $hf_needed"
 }
