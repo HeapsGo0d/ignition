@@ -164,6 +164,36 @@ COMFYUI_PORT="3000"
 FILEBROWSER_PORT="3001"
 ```
 
+### 💣 Nuclear Cleanup (Nuke)
+
+Ignition includes a nuclear cleanup feature that **deletes all user data and models** for a fresh start.
+
+**Automatic**: Runs on clean pod shutdown (after successful ComfyUI start)
+```bash
+# Stop your pod normally - nuke runs automatically
+# Next start will be completely fresh
+```
+
+**Manual**: Run anytime via SSH
+```bash
+# SSH into your pod
+nuke
+
+# Output:
+# 💣 NUKE: Deleting all user data and models...
+# ✅ Nuclear cleanup complete
+```
+
+**What Gets Deleted**:
+- User data: `/workspace/ComfyUI/{user,input,output}/*`
+- Temp files: `/tmp/*`, `/workspace/ComfyUI/temp/*`
+- Cache: `/root/.cache/*`, `/root/.bash_history`
+- Config: `/root/.config/*`, `/root/.local/share/*`
+- Logs: `/workspace/ComfyUI/logs/*`
+- **Models**: `/workspace/ComfyUI/models/*` (all downloaded models)
+
+**Safety**: Nuke only runs automatically if ComfyUI successfully started. Failed startups (GPU errors, download failures, etc.) preserve data for debugging.
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
