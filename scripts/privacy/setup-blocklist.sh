@@ -48,13 +48,14 @@ BLOCKLIST=(
     "logrocket.com"
 )
 
-# Add blocklist entries
+# Add blocklist entries (IPv4 + IPv6)
 for domain in "${BLOCKLIST[@]}"; do
     # Check if already blocked
     if ! grep -q "127.0.0.1 $domain" /etc/hosts 2>/dev/null; then
         echo "127.0.0.1 $domain" >> /etc/hosts
-        echo "  • Blocked: $domain"
+        echo "::1 $domain" >> /etc/hosts
+        echo "  • Blocked: $domain (IPv4 + IPv6)"
     fi
 done
 
-echo "✅ Telemetry blocklist active (${#BLOCKLIST[@]} domains)"
+echo "✅ Telemetry blocklist active (${#BLOCKLIST[@]} domains, IPv4 + IPv6)"

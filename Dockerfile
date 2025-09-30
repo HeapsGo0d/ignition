@@ -22,6 +22,7 @@ WORKDIR /workspace
 # Install additional system dependencies including aria2 for downloads
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ffmpeg git aria2 git-lfs wget vim \
+    iproute2 net-tools \
     libgl1-mesa-glx libglib2.0-0 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
