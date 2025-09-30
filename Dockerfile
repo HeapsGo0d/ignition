@@ -76,7 +76,7 @@ RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh |
 
 # Copy our scripts
 COPY scripts/ /workspace/scripts/
-RUN chmod +x /workspace/scripts/*.sh
+RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh
 
 # Install nuke script for nuclear cleanup
 COPY scripts/nuke /usr/local/bin/nuke

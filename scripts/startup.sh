@@ -250,6 +250,11 @@ start_comfyui() {
 cleanup() {
     log "INFO" "🛑 Shutting down Ignition..."
 
+    # Kill connection monitor if running
+    if [[ -n "${MONITOR_PID:-}" ]] && kill -0 "$MONITOR_PID" 2>/dev/null; then
+        kill "$MONITOR_PID" 2>/dev/null || true
+    fi
+
     # Kill background processes (File Browser, etc.)
     jobs -p | xargs -r kill 2>/dev/null || true
 
@@ -269,13 +274,40 @@ trap_handler() {
 
 trap trap_handler EXIT SIGTERM SIGINT
 
+# Privacy monitoring
+start_connection_monitor() {
+    log "INFO" "📊 Starting connection monitoring (every 2 minutes)..."
+
+    (while true; do
+        /workspace/scripts/privacy/connection-snapshot.sh
+        sleep 120
+    done) &
+    MONITOR_PID=$!
+
+    log "INFO" "  • Monitor PID: $MONITOR_PID"
+    log "INFO" "  • View logs: /workspace/scripts/privacy/show-connections.sh"
+    log "INFO" ""
+}
+
 # Main execution
 main() {
     print_banner
     print_config
     check_system
     setup_storage
+
+    # Setup telemetry blocklist BEFORE downloads
+    if [[ -x "/workspace/scripts/privacy/setup-blocklist.sh" ]]; then
+        /workspace/scripts/privacy/setup-blocklist.sh
+    fi
+
     download_models
+
+    # Start connection monitoring AFTER downloads
+    if [[ -x "/workspace/scripts/privacy/connection-snapshot.sh" ]]; then
+        start_connection_monitor
+    fi
+
     start_filebrowser
     gpu_preflight
     start_comfyui
