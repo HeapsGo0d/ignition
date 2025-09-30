@@ -2,7 +2,15 @@
 # Nuclear cleanup: delete all user data and models
 echo "💣 NUKE: Deleting all user data and models..."
 shopt -s nullglob
+
+# PHASE 1: ESSENTIAL USER DATA
 rm -rf /workspace/ComfyUI/user/* /workspace/ComfyUI/input/* /workspace/ComfyUI/output/*
 rm -rf /root/.bash_history /root/.cache/* /tmp/* /workspace/ComfyUI/temp/*
+
+# PHASE 2: ABSOLUTE PARANOIA
+rm -rf /root/.local/share/* /root/.config/* /var/tmp/*
+
+# PHASE 3: APPLICATION DATA & MODELS
 rm -rf /workspace/ComfyUI/logs/* /workspace/ComfyUI/models/*
+
 echo "✅ Nuclear cleanup complete"
