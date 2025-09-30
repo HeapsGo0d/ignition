@@ -79,15 +79,8 @@ COPY scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
 
 # Install nuke script for nuclear cleanup
-RUN echo '#!/bin/bash\n\
-# Nuclear cleanup: delete all user data and models\n\
-echo "💣 NUKE: Deleting all user data and models..."\n\
-shopt -s nullglob\n\
-rm -rf /workspace/ComfyUI/user/* /workspace/ComfyUI/input/* /workspace/ComfyUI/output/*\n\
-rm -rf /root/.bash_history /root/.cache/* /tmp/* /workspace/ComfyUI/temp/*\n\
-rm -rf /workspace/ComfyUI/logs/* /workspace/ComfyUI/models/*\n\
-echo "✅ Nuclear cleanup complete"' > /usr/local/bin/nuke && \
-    chmod +x /usr/local/bin/nuke
+COPY scripts/nuke /usr/local/bin/nuke
+RUN chmod +x /usr/local/bin/nuke
 
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""

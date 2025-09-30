@@ -1,0 +1,8 @@
+#!/bin/bash
+# Nuclear cleanup: delete all user data and models
+echo "💣 NUKE: Deleting all user data and models..."
+shopt -s nullglob
+rm -rf /workspace/ComfyUI/user/* /workspace/ComfyUI/input/* /workspace/ComfyUI/output/*
+rm -rf /root/.bash_history /root/.cache/* /tmp/* /workspace/ComfyUI/temp/*
+rm -rf /workspace/ComfyUI/logs/* /workspace/ComfyUI/models/*
+echo "✅ Nuclear cleanup complete"
