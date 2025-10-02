@@ -72,27 +72,48 @@ jobs:
     - name: Clean up old Docker images
       if: success()
       run: |
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq
+
         # Get authentication token
-        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "${{ secrets.DOCKER_USERNAME }}", "password": "${{ secrets.DOCKER_PASSWORD }}"}' https://hub.docker.com/v2/users/login/ | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-        
-        # Get list of all tags
-        TAGS=$(curl -s -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/ignition-comfyui/tags/?page_size=100" | grep -o '"name":"v[0-9]\+\.[0-9]\+\.[0-9]\+"' | cut -d'"' -f4 | sort -V)
-        
-        # Count total tags and keep only the latest 3
+        echo "Authenticating with Docker Hub..."
+        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+          -d '{"username": "${{ secrets.DOCKER_USERNAME }}", "password": "${{ secrets.DOCKER_PASSWORD }}"}' \
+          https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+        if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+          echo "Failed to authenticate with Docker Hub"
+          exit 1
+        fi
+
+        # Get all version tags (starting with 'v') sorted by version
+        echo "Fetching tags..."
+        TAGS=$(curl -s -H "Authorization: JWT $TOKEN" \
+          "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/ignition-comfyui/tags/?page_size=100" \
+          | jq -r '.results[].name' | grep -E '^v[0-9]' | sort -V)
+
+        # Convert to array and keep only latest 10
         TAG_ARRAY=($TAGS)
         TOTAL_TAGS=${#TAG_ARRAY[@]}
-        
-        if [ $TOTAL_TAGS -gt 3 ]; then
-          TAGS_TO_DELETE=${TAG_ARRAY[@]:0:$((TOTAL_TAGS-3))}
-          
-          for tag in $TAGS_TO_DELETE; do
-            echo "Deleting old tag: $tag"
-            curl -s -X DELETE \
-              -H "Authorization: JWT $TOKEN" \
-              "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/ignition-comfyui/tags/$tag/"
-          done
-          
-          echo "Cleaned up $((TOTAL_TAGS-3)) old image tags"
-        else
+        echo "Found $TOTAL_TAGS version tags"
+
+        if [ $TOTAL_TAGS -le 10 ]; then
           echo "Only $TOTAL_TAGS tags found, no cleanup needed"
+          exit 0
         fi
+
+        # Delete all but latest 10
+        KEEP_COUNT=10
+        DELETE_COUNT=$((TOTAL_TAGS - KEEP_COUNT))
+        TAGS_TO_DELETE=("${TAG_ARRAY[@]:0:$DELETE_COUNT}")
+
+        echo "Deleting $DELETE_COUNT old tags (keeping latest $KEEP_COUNT)..."
+        for tag in "${TAGS_TO_DELETE[@]}"; do
+          echo "  Deleting: $tag"
+          RESULT=$(curl -s -X DELETE \
+            -H "Authorization: JWT $TOKEN" \
+            "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/ignition-comfyui/tags/$tag/")
+          echo "    Response: $(echo $RESULT | jq -r '.detail // "deleted"')"
+        done
+
+        echo "✅ Cleanup complete! Kept latest $KEEP_COUNT tags, deleted $DELETE_COUNT old tags"
