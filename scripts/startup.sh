@@ -239,8 +239,20 @@ start_comfyui() {
     "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT" &
     COMFYUI_PID=$!
 
-    # Mark as successfully started (enables nuke on clean shutdown)
-    COMFYUI_STARTED=true
+    # Wait for ComfyUI to actually start (max 30 seconds)
+    for i in {1..30}; do
+        if curl -sf http://127.0.0.1:$COMFYUI_PORT/ >/dev/null 2>&1; then
+            COMFYUI_STARTED=true
+            log "INFO" "✅ ComfyUI responding on port $COMFYUI_PORT"
+            break
+        fi
+        sleep 1
+    done
+
+    if [[ "$COMFYUI_STARTED" != "true" ]]; then
+        log "ERROR" "❌ ComfyUI failed to start within 30 seconds"
+        exit 5
+    fi
 
     # Wait for ComfyUI to exit
     wait $COMFYUI_PID
@@ -301,12 +313,12 @@ main() {
         /workspace/scripts/privacy/setup-blocklist.sh
     fi
 
-    download_models
-
-    # Start connection monitoring AFTER downloads
+    # Start connection monitoring BEFORE downloads
     if [[ -x "/workspace/scripts/privacy/connection-snapshot.sh" ]]; then
         start_connection_monitor
     fi
+
+    download_models
 
     start_filebrowser
     gpu_preflight
