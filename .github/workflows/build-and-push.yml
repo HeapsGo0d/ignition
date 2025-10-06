@@ -86,28 +86,35 @@ jobs:
           exit 1
         fi
 
-        # Get all version tags (starting with 'v') sorted by version
+        # Get current tag being built (to protect from deletion)
+        CURRENT_TAG="${GITHUB_REF_NAME}"
+        echo "Current tag: $CURRENT_TAG"
+
+        # Get all version tags (starting with 'v') sorted by last_updated (newest first)
+        # Exclude current tag from the list
         echo "Fetching tags..."
         TAGS=$(curl -s -H "Authorization: JWT $TOKEN" \
           "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/ignition-comfyui/tags/?page_size=100" \
-          | jq -r '.results[].name' | grep -E '^v[0-9]' | sort -V)
+          | jq -r '.results | sort_by(.last_updated) | reverse | .[].name' \
+          | grep -E '^v[0-9]' \
+          | grep -v "^${CURRENT_TAG}$")
 
-        # Convert to array and keep only latest 10
+        # Convert to array and keep only latest 3 (excluding current)
         TAG_ARRAY=($TAGS)
         TOTAL_TAGS=${#TAG_ARRAY[@]}
-        echo "Found $TOTAL_TAGS version tags"
+        echo "Found $TOTAL_TAGS version tags (excluding current tag)"
 
-        if [ $TOTAL_TAGS -le 10 ]; then
+        if [ $TOTAL_TAGS -le 3 ]; then
           echo "Only $TOTAL_TAGS tags found, no cleanup needed"
           exit 0
         fi
 
-        # Delete all but latest 10
-        KEEP_COUNT=10
+        # Delete all but latest 3 (plus current tag which is already excluded)
+        KEEP_COUNT=3
         DELETE_COUNT=$((TOTAL_TAGS - KEEP_COUNT))
-        TAGS_TO_DELETE=("${TAG_ARRAY[@]:0:$DELETE_COUNT}")
+        TAGS_TO_DELETE=("${TAG_ARRAY[@]:$KEEP_COUNT}")
 
-        echo "Deleting $DELETE_COUNT old tags (keeping latest $KEEP_COUNT)..."
+        echo "Deleting $DELETE_COUNT old tags (keeping latest $KEEP_COUNT + current tag)..."
         for tag in "${TAGS_TO_DELETE[@]}"; do
           echo "  Deleting: $tag"
           RESULT=$(curl -s -X DELETE \
@@ -116,4 +123,4 @@ jobs:
           echo "    Response: $(echo $RESULT | jq -r '.detail // "deleted"')"
         done
 
-        echo "✅ Cleanup complete! Kept latest $KEEP_COUNT tags, deleted $DELETE_COUNT old tags"
+        echo "✅ Cleanup complete! Kept latest $KEEP_COUNT tags + current tag, deleted $DELETE_COUNT old tags"
