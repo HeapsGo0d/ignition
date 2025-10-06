@@ -219,9 +219,24 @@ nuke
 Optimized for sub-30 second startup and instant boot performance.
 
 ### Startup Flags
-- **Environment-tunable**: `--gpu-only --preview-method auto --normalvram --use-sage-attention`
-- **Configure via**: `export COMFY_FLAGS="your custom flags"`
+- **Default flags**: `--gpu-only --preview-method auto --normalvram --use-sage-attention`
+- **Customize per-pod**: Override via environment variable
 - **Logged on startup**: `[ignition] Startup flags: ${COMFY_FLAGS}`
+
+**Customization Examples**:
+```bash
+# Low VRAM mode (for cards with limited memory)
+export COMFY_FLAGS="--gpu-only --lowvram --use-sage-attention"
+
+# Disable SAGE temporarily (troubleshooting)
+export COMFY_FLAGS="--gpu-only --preview-method auto --normalvram"
+
+# High VRAM mode (maximize performance on high-end cards)
+export COMFY_FLAGS="--gpu-only --highvram --use-sage-attention"
+
+# Minimal flags (fastest startup, testing)
+export COMFY_FLAGS="--gpu-only"
+```
 
 ### SAGE Attention
 - **Enabled automatically** via `--use-sage-attention` startup flag
