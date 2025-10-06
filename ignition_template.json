@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v1.9.4-privacy-lite",
+  "name": "Ignition ComfyUI v3.0.0-clean-foundation",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v1.9.4-privacy-lite",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.0.0-clean-foundation",
   "ports": [
     {
       "privatePort": 8188,
