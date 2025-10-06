@@ -219,7 +219,7 @@ nuke
 Optimized for sub-30 second startup and instant boot performance.
 
 ### Startup Flags
-- **Default flags**: `--gpu-only --preview-method auto --normalvram --use-sage-attention`
+- **Default flags**: `--gpu-only --preview-method auto --use-sage-attention`
 - **Customize per-pod**: Override via environment variable
 - **Logged on startup**: `[ignition] Startup flags: ${COMFY_FLAGS}`
 
