@@ -238,7 +238,7 @@ start_comfyui() {
     # Start ComfyUI in background instead of exec (allows trap to work)
     # ---- ignition flags (env-tunable) ----
     : "${COMFYUI_PORT:=8188}"
-    : "${COMFY_FLAGS:=--gpu-only --preview-method auto --normalvram}"
+    : "${COMFY_FLAGS:=--gpu-only --preview-method auto --normalvram --use-sage-attention}"
     echo "[ignition] Startup flags: ${COMFY_FLAGS}"
 
     "$PYBIN" main.py ${COMFY_FLAGS} --listen "0.0.0.0" --port "$COMFYUI_PORT" &
