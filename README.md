@@ -214,6 +214,55 @@ nuke
 
 **Safety**: Nuke only runs automatically if ComfyUI successfully started. Failed startups (GPU errors, download failures, etc.) preserve data for debugging.
 
+## Performance Profile
+
+Optimized for sub-30 second startup and instant boot performance.
+
+### Startup Flags
+- **Environment-tunable**: `--gpu-only --preview-method auto --normalvram`
+- **Configure via**: `export COMFY_FLAGS="your custom flags"`
+- **Logged on startup**: `[ignition] Startup flags: ${COMFY_FLAGS}`
+
+### SDXL VAE
+- **Official Stability AI VAE** available as drop-in replacement
+- **Download**: `scripts/download-sdxl-vae.sh`
+- **Size**: ~335MB
+- **Location**: `/workspace/ComfyUI/models/vae/sdxl_vae.safetensors`
+
+### Curated Plugins
+**Core (always installed)**:
+- **ComfyUI-eSuite**: Essential utilities for enhanced workflow
+- **ComfyUI-Crystools**: Productivity tools and helpers
+- **ComfyUI-Various**: Auto Node Layout for clean graphs
+
+**Optional (env-gated)**:
+```bash
+export ENABLE_IMPACT_PACK=1        # Detailer nodes for refinement
+export ENABLE_CONTROLNET_AUX=1     # ControlNet preprocessors
+```
+
+### Installation
+Run the performance optimization script:
+```bash
+# Download SDXL VAE
+./scripts/download-sdxl-vae.sh
+
+# Install plugins (with optional packs)
+export ENABLE_IMPACT_PACK=1
+export ENABLE_CONTROLNET_AUX=1
+./scripts/install-performance-plugins.sh
+```
+
+### Version Locking
+- Plugin versions pinned in `plugins.lock` for reproducible builds
+- ComfyUI-Manager network mode disabled for instant boot
+- Zero FETCH delays on startup
+
+### Expected Performance
+- ⚡ **Startup**: <30s (vs 2-3min baseline)
+- 🚀 **Boot**: Instant (no network fetches)
+- 📦 **Reproducible**: Version-locked plugins
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
