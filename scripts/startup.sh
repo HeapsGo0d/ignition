@@ -224,6 +224,27 @@ PY
     log "INFO" ""
 }
 
+disable_manager_network() {
+    log "INFO" "🔧 Disabling ComfyUI-Manager network mode..."
+
+    local MANAGER_DIR="$COMFYUI_ROOT/user/default/ComfyUI-Manager"
+    mkdir -p "$MANAGER_DIR"
+
+    cat > "$MANAGER_DIR/config.ini" << 'EOF'
+[default]
+preview_method = none
+network_mode = disable
+git_exe =
+use_uv = True
+channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
+share_option = all
+bypass_ssl = False
+EOF
+
+    log "INFO" "✅ ComfyUI-Manager network mode disabled"
+    log "INFO" ""
+}
+
 start_comfyui() {
     log "INFO" "🎨 Starting ComfyUI..."
 
@@ -327,6 +348,7 @@ main() {
 
     start_filebrowser
     gpu_preflight
+    disable_manager_network
     start_comfyui
 }
 
