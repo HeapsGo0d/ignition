@@ -82,7 +82,7 @@ echo "⚙️  Configuring ComfyUI-Manager..."
 cat > "$MANAGER_DIR/config.ini" << 'EOF'
 [default]
 preview_method = none
-network_mode = disable
+network_mode = private
 git_exe =
 use_uv = True
 channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main

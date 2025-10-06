@@ -233,7 +233,7 @@ disable_manager_network() {
     cat > "$MANAGER_DIR/config.ini" << 'EOF'
 [default]
 preview_method = none
-network_mode = disable
+network_mode = private
 git_exe =
 use_uv = True
 channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
@@ -259,7 +259,7 @@ start_comfyui() {
     # Start ComfyUI in background instead of exec (allows trap to work)
     # ---- ignition flags (env-tunable) ----
     : "${COMFYUI_PORT:=8188}"
-    : "${COMFY_FLAGS:=--gpu-only --preview-method auto --use-sage-attention}"
+    : "${COMFY_FLAGS:=--preview-method auto --use-sage-attention}"
     echo "[ignition] Startup flags: ${COMFY_FLAGS}"
 
     "$PYBIN" main.py ${COMFY_FLAGS} --listen "0.0.0.0" --port "$COMFYUI_PORT" &

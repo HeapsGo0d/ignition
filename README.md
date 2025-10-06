@@ -184,6 +184,8 @@ Ignition includes basic privacy protection for telemetry blocking and connection
 
 **Automatic Setup**: Privacy protection activates automatically on container start before any model downloads occur.
 
+**Known Issue (ComfyUI-Manager V3.30+)**: The Manager may still fetch registry data on startup despite `network_mode = private` config. This is a known Manager bug being fixed upstream. The fetch runs in the background and doesn't block ComfyUI functionality.
+
 ### 💣 Nuclear Cleanup (Nuke)
 
 Ignition includes a nuclear cleanup feature that **deletes all user data and models** for a fresh start.
@@ -219,24 +221,30 @@ nuke
 Optimized for sub-30 second startup and instant boot performance.
 
 ### Startup Flags
-- **Default flags**: `--gpu-only --preview-method auto --use-sage-attention`
+- **Default flags**: `--preview-method auto --use-sage-attention`
 - **Customize per-pod**: Override via environment variable
 - **Logged on startup**: `[ignition] Startup flags: ${COMFY_FLAGS}`
+- **VRAM auto-detection**: ComfyUI automatically selects VRAM mode based on GPU memory (32GB+ → HIGH_VRAM)
 
 **Customization Examples**:
 ```bash
 # Low VRAM mode (for cards with limited memory)
-export COMFY_FLAGS="--gpu-only --lowvram --use-sage-attention"
+export COMFY_FLAGS="--lowvram --use-sage-attention"
 
 # Disable SAGE temporarily (troubleshooting)
-export COMFY_FLAGS="--gpu-only --preview-method auto --normalvram"
+export COMFY_FLAGS="--preview-method auto"
 
-# High VRAM mode (maximize performance on high-end cards)
-export COMFY_FLAGS="--gpu-only --highvram --use-sage-attention"
+# Force GPU-only mode (advanced - may cause OOM with large models)
+export COMFY_FLAGS="--gpu-only --preview-method auto --use-sage-attention"
+
+# High VRAM mode (for very large workflows on 48GB+ cards)
+export COMFY_FLAGS="--highvram --use-sage-attention"
 
 # Minimal flags (fastest startup, testing)
-export COMFY_FLAGS="--gpu-only"
+export COMFY_FLAGS=""
 ```
+
+**Note**: Removed `--gpu-only` from defaults in v3.1.5 to prevent OOM errors with large Flux models. ComfyUI's dynamic memory management now handles loading/unloading automatically.
 
 ### SAGE Attention
 - **Enabled automatically** via `--use-sage-attention` startup flag
