@@ -35,3 +35,8 @@ Thumbs.db
 test_downloads/
 models_temp/
 template_inputs.txt
+
+# Additional Python patterns
+.pytest_cache/
+*.pyc
+.mypy_cache/

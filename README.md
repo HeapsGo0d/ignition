@@ -1,5 +1,7 @@
 # 🚀 Ignition - Dynamic ComfyUI for RunPod
 
+**Simplicity · Elegance · Functional**
+
 Ignition is a RunPod-optimized Docker container that automatically downloads and configures models for ComfyUI at runtime. Built for RTX 5090 performance with robust, atomic file operations that prevent infinite download loops.
 
 ## ✨ Features

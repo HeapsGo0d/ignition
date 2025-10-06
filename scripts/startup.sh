@@ -68,7 +68,7 @@ export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║              🚀 IGNITION v1.8.0          ║"
+    log "INFO" "║         🚀 IGNITION v1.9.2-privacy-lite  ║"
     log "INFO" "║        ComfyUI Dynamic Model Loader      ║"
     log "INFO" "║             SIMPLE EDITION               ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
