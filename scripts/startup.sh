@@ -21,6 +21,8 @@ PYBIN="$(command -v python3 || command -v python)"
 
 # Track if ComfyUI successfully started (for nuke on clean shutdown only)
 COMFYUI_STARTED=false
+# Track background process PIDs for cleanup
+FILEBROWSER_PID=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -175,7 +177,8 @@ start_filebrowser() {
         --root "$WORKSPACE_ROOT" \
         --address "0.0.0.0" \
         --port "$FILEBROWSER_PORT" &
-    
+    FILEBROWSER_PID=$!
+
     log "INFO" "  • Login: admin (password not shown in logs)"
     log "INFO" ""
 }
@@ -296,8 +299,7 @@ start_comfyui() {
         exit 5
     fi
 
-    # Wait for ComfyUI to exit
-    wait $COMFYUI_PID
+    log "INFO" ""
 }
 
 # Signal handlers
@@ -309,7 +311,12 @@ cleanup() {
         kill "$MONITOR_PID" 2>/dev/null || true
     fi
 
-    # Kill background processes (File Browser, etc.)
+    # Kill filebrowser gracefully
+    if [[ -n "${FILEBROWSER_PID:-}" ]] && kill -0 "$FILEBROWSER_PID" 2>/dev/null; then
+        kill "$FILEBROWSER_PID" 2>/dev/null || true
+    fi
+
+    # Kill background processes (any other jobs)
     jobs -p | xargs -r kill 2>/dev/null || true
 
     # Run nuclear cleanup only if ComfyUI successfully started
@@ -367,6 +374,14 @@ main() {
     disable_manager_network
     remove_manager_web_extensions
     start_comfyui
+
+    log "INFO" "🚀 All services started successfully"
+    log "INFO" "💡 ComfyUI: http://0.0.0.0:$COMFYUI_PORT"
+    log "INFO" "📁 File Browser: http://0.0.0.0:$FILEBROWSER_PORT"
+    log "INFO" ""
+
+    # Wait for ComfyUI to exit
+    wait $COMFYUI_PID
 }
 
 main "$@"
