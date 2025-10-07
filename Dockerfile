@@ -55,6 +55,10 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     cd ComfyUI-Manager && \
     pip install --no-cache-dir -r requirements.txt
 
+# Remove Manager JS bloat for instant UI loads
+RUN rm -rf /workspace/ComfyUI/custom_nodes/ComfyUI-Manager/js/ && \
+    echo "✅ Removed Manager UI bloat - instant loads enabled"
+
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \

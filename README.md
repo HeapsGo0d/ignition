@@ -227,6 +227,16 @@ This image includes targeted fixes for ComfyUI startup and inference:
 - SAGE Attention support (optional, see `scripts/optional/`)
 - Environment-driven `COMFY_FLAGS` for customization
 
+### Instant UI Loading
+Manager UI disabled - Removed ~200KB JavaScript for instant loading
+Backend fully functional - All Manager APIs and core features remain active
+
+To restore UI:
+```bash
+git clone https://github.com/ltdrdata/ComfyUI-Manager.git \
+  /workspace/ComfyUI/custom_nodes/ComfyUI-Manager
+```
+
 **Customization Examples**:
 ```bash
 # Low VRAM mode (for cards with limited memory)
