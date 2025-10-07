@@ -33,16 +33,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Use PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
 # Based on Hearmeman's proven approach: https://github.com/Hearmeman24/comfyui-sdxl
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+    pip install --pre --upgrade --upgrade-strategy eager \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
 # Runtime libraries (triton comes with PyTorch nightly)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install pyyaml gdown
 
 # Install ComfyUI directly (more reliable than comfy-cli)
+# Filter out torch packages to prevent downgrade from nightly
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     cd /workspace/ComfyUI && \
-    pip install --no-cache-dir -r requirements.txt
+    grep -v "^torch" requirements.txt | pip install --no-cache-dir -r /dev/stdin
 
 # Install ComfyUI-Manager for custom node management
 RUN cd /workspace/ComfyUI/custom_nodes && \
