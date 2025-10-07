@@ -30,11 +30,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Upgrade PyTorch to 2.8.0+cu128 for RTX 5090 support (sm_120)
+# Use PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
+# Based on Hearmeman's proven approach: https://github.com/Hearmeman24/comfyui-sdxl
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+    pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
-# Runtime libraries (triton comes with PyTorch 2.8.0)
+# Runtime libraries (triton comes with PyTorch nightly)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install pyyaml gdown
 

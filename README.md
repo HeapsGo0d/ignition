@@ -241,6 +241,24 @@ export COMFY_FLAGS=""
 
 See commit history for deferred optimizations (Phase 2).
 
+## 🐛 Recent Fixes (v3.2.1-refined)
+
+**Critical bug fixes from v3.2.0:**
+- ✅ **PyTorch for RTX 5090**: Fixed to use nightly builds with `--pre` flag and `nightly/cu128` index (based on Hearmeman's proven approach)
+- ✅ **FLUX Schnell Mapping**: Removed incorrect model mapping that returned VAE instead of diffusion model
+- ✅ **POSIX Compliance**: Added trailing newlines to shell/Python files
+
+**Upgrade Notice:** If using v3.2.0 or earlier, rebuild images to get fixes.
+
+**Build Verification:**
+```bash
+# Verify PyTorch nightly after build
+docker run --rm ignition-comfyui:v3.2.1-refined python -c "import torch; print(torch.__version__)"
+# Should show nightly version with +cu128
+```
+
+See [BUGFIX_REPORT.md](BUGFIX_REPORT.md) for full investigation details.
+
 ## 🐛 Troubleshooting
 
 ### Common Issues

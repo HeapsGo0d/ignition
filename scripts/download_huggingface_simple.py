@@ -53,7 +53,6 @@ def normalize_flux_key(model_input: str) -> str:
     # Map common HF repo formats to our internal keys
     repo_mappings = {
         'black-forest-labs/FLUX.1-dev': 'flux1-dev',
-        'black-forest-labs/FLUX.1-schnell': 'ae',
         'Comfy-Org/flux1-dev': 'flux1-dev',
         'comfyanonymous/flux_text_encoders': 'clip_l,t5xxl_fp16'  # Default to fp16 variant
     }
