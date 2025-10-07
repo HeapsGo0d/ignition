@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"  # Update with your actual Docker Hub username
-TEMPLATE_NAME="Ignition ComfyUI v1.0"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.2.1-refined"
+TEMPLATE_NAME="Ignition ComfyUI v3.2.1-refined"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace - Performance optimized with RTX 5090 support"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
