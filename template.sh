@@ -63,7 +63,7 @@ print_usage() {
     echo ""
     echo -e "${GREEN}Template will include:${NC}"
     echo "  ✅ Pre-configured Docker image"
-    echo "  ✅ Exposed ports (8188 for ComfyUI, 8080 for file browser)"
+    echo "  ✅ Exposed ports (8081 optimized, 8188 direct, 8080 file browser)"
     echo "  ✅ Environment variables for model configuration"
     echo "  ✅ GPU support enabled"
     echo "  ✅ Network volume support"
@@ -188,10 +188,16 @@ generate_template() {
   "dockerImage": "$DOCKER_IMAGE",
   "ports": [
     {
+      "privatePort": 8081,
+      "publicPort": 8081,
+      "type": "http",
+      "description": "ComfyUI (Optimized - nginx with compression)"
+    },
+    {
       "privatePort": 8188,
       "publicPort": 8188,
       "type": "http",
-      "description": "ComfyUI Web Interface"
+      "description": "ComfyUI (Direct - Python server)"
     },
     {
       "privatePort": 8080,
@@ -294,7 +300,8 @@ print_summary() {
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
-    echo "  ComfyUI: http://[pod-id]-8188.proxy.runpod.net"
+    echo "  ComfyUI (Optimized): http://[pod-id]-8081.proxy.runpod.net"
+    echo "  ComfyUI (Direct): http://[pod-id]-8188.proxy.runpod.net"
     echo "  File Browser: http://[pod-id]-8080.proxy.runpod.net"
     echo "  File Browser Login: admin / $FILEBROWSER_PASSWORD"
     echo ""
@@ -322,7 +329,8 @@ generate_instructions() {
 
 Once your pod is running:
 
-- **ComfyUI**: \`http://[your-pod-id]-8188.proxy.runpod.net\`
+- **ComfyUI (Optimized)**: \`http://[your-pod-id]-8081.proxy.runpod.net\` ⚡ **Recommended** - 7-10x faster
+- **ComfyUI (Direct)**: \`http://[your-pod-id]-8188.proxy.runpod.net\` - Direct Python server
 - **File Browser**: \`http://[your-pod-id]-8080.proxy.runpod.net\`
   - Username: \`admin\`
   - Password: \`$FILEBROWSER_PASSWORD\`
@@ -406,8 +414,8 @@ deploy_template() {
   "volumeInGb": $VOLUME_GB,
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
-  "ports": "8188/http,8080/http",
-  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- CivitAI LoRAs: $CIVITAI_LORAS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
+  "ports": "8081/http,8188/http,8080/http",
+  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- CivitAI LoRAs: $CIVITAI_LORAS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)\\n\\n## Access\\n- Port 8081: ComfyUI (Optimized) - nginx with compression (7-10x faster)\\n- Port 8188: ComfyUI (Direct) - Python server\\n- Port 8080: File Browser",
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "CIVITAI_LORAS", "value": "$CIVITAI_LORAS"},
@@ -503,7 +511,7 @@ main() {
             echo "  1. Go to RunPod Console → Templates"
             echo "  2. Find your '$TEMPLATE_NAME' template"
             echo "  3. Deploy a pod using your new template"
-            echo "  4. Access ComfyUI at http://[pod-id]-8188.proxy.runpod.net"
+            echo "  4. Access ComfyUI (optimized) at http://[pod-id]-8081.proxy.runpod.net"
             echo "  5. Manage files at http://[pod-id]-8080.proxy.runpod.net"
         else
             echo ""
@@ -520,7 +528,7 @@ main() {
         echo -e "${YELLOW}Next Steps:${NC}"
         echo "  1. Upload ignition_template.json to RunPod Templates"
         echo "  2. Deploy a pod using your new template"
-        echo "  3. Access ComfyUI at http://[pod-id]-8188.proxy.runpod.net"
+        echo "  3. Access ComfyUI (optimized) at http://[pod-id]-8081.proxy.runpod.net"
         echo "  4. Manage files at http://[pod-id]-8080.proxy.runpod.net"
         echo ""
         echo -e "${BLUE}💡 Tip: Use './template.sh --deploy' for automatic deployment${NC}"

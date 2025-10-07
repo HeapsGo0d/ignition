@@ -59,6 +59,20 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
 RUN rm -rf /workspace/ComfyUI/custom_nodes/ComfyUI-Manager/js/ && \
     echo "✅ Removed Manager UI bloat - instant loads enabled"
 
+# Pre-compress ComfyUI frontend for instant loads (80%+ size reduction)
+RUN FRONTEND_PATH=$(python3 -c "import comfyui_frontend_package; import importlib.resources; print(importlib.resources.files(comfyui_frontend_package) / 'static')") && \
+    echo "📦 Pre-compressing frontend at: $FRONTEND_PATH" && \
+    find "$FRONTEND_PATH" -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" \) \
+        ! -name "*.map" \
+        -exec gzip -k9 {} \; && \
+    echo "✅ Created $(find $FRONTEND_PATH -name '*.gz' | wc -l) compressed files" && \
+    echo "📊 Size: $(du -sh $FRONTEND_PATH | cut -f1) → $(du -sh $FRONTEND_PATH/*.gz 2>/dev/null | head -1 | cut -f1 || echo 'compressed')"
+
+# Install nginx for static asset serving with compression
+RUN apt-get update && apt-get install -y --no-install-recommends nginx && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /etc/nginx/sites-{available,enabled}
+
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \
@@ -97,6 +111,12 @@ RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh
 COPY scripts/nuke /usr/local/bin/nuke
 RUN chmod +x /usr/local/bin/nuke
 
+# Copy nginx configuration
+COPY scripts/nginx-comfyui.conf /etc/nginx/sites-available/comfyui
+RUN ln -sf /etc/nginx/sites-available/comfyui /etc/nginx/sites-enabled/default && \
+    rm -f /etc/nginx/sites-enabled/default.bak && \
+    nginx -t
+
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""
 ENV CIVITAI_LORAS=""
@@ -109,8 +129,8 @@ ENV FILEBROWSER_PASSWORD="runpod"
 ENV COMFYUI_PORT="8188"
 ENV FILEBROWSER_PORT="8080"
 
-# Expose ports
-EXPOSE 8188 8080
+# Expose ports (8081 for nginx-optimized frontend, 8188 for direct ComfyUI, 8080 for file browser)
+EXPOSE 8081 8188 8080
 
 # Add basic healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \

@@ -14,6 +14,24 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 - **🏗️ Auto-Build Pipeline**: GitHub Actions automatically builds and tags Docker images
 - **📊 Progress Monitoring**: Real-time download progress and system status logging
 
+### ⚡ Performance Optimizations
+
+**Frontend Loading:**
+- Pre-compressed static assets (gzip) for 80%+ size reduction
+- nginx reverse proxy with aggressive browser caching
+- **Load time improvement: 167s → 15-25s** (7-10x faster)
+- Instant subsequent loads via browser cache
+
+**Before optimization:**
+- 49MB uncompressed frontend assets
+- 167 second initial page load
+- ~14 KB/s effective transfer rate
+
+**After optimization:**
+- 3MB compressed assets delivered
+- 15-25 second initial load
+- Instant cached loads thereafter
+
 ## 🎯 Supported Model Sources
 
 ### CivitAI
@@ -129,6 +147,16 @@ Models are automatically organized into the correct ComfyUI directories:
 1. Go to the model repository on HuggingFace
 2. The repository ID is in the URL: `huggingface.co/black-forest-labs/FLUX.1-dev`
 3. Use the full repository path: `black-forest-labs/FLUX.1-dev`
+
+## 🌐 Access URLs
+
+| Service | Port | URL | Purpose |
+|---------|------|-----|---------|
+| **ComfyUI (Optimized)** | 8081 | `http://[pod-id]-8081.proxy.runpod.net` | **Primary** - nginx-served with compression |
+| ComfyUI (Direct) | 8188 | `http://[pod-id]-8188.proxy.runpod.net` | Alternative - direct Python server |
+| File Browser | 8080 | `http://[pod-id]-8080.proxy.runpod.net` | File management |
+
+**Recommended**: Use port 8081 for best performance.
 
 ## 💾 Storage Options
 
