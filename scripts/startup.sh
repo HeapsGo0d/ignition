@@ -224,6 +224,43 @@ PY
     log "INFO" ""
 }
 
+disable_manager_network() {
+    log "INFO" "🔧 Disabling ComfyUI-Manager network mode..."
+
+    local MANAGER_DIR="$COMFYUI_ROOT/user/default/ComfyUI-Manager"
+    mkdir -p "$MANAGER_DIR"
+
+    cat > "$MANAGER_DIR/config.ini" << 'EOF'
+[default]
+preview_method = none
+network_mode = offline
+git_exe =
+use_uv = True
+channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
+share_option = all
+bypass_ssl = False
+EOF
+
+    log "INFO" "✅ ComfyUI-Manager network mode disabled"
+    log "INFO" ""
+}
+
+remove_manager_web_extensions() {
+    log "INFO" "🚀 Removing legacy ComfyUI-Manager web extensions..."
+
+    local WEB_EXTENSIONS_DIR="$COMFYUI_ROOT/web/extensions/ComfyUI-Manager"
+
+    if [[ -d "$WEB_EXTENSIONS_DIR" ]]; then
+        SIZE=$(du -sh "$WEB_EXTENSIONS_DIR" 2>/dev/null | cut -f1 || echo "unknown")
+        log "INFO" "  • Removing legacy web extensions ($SIZE)"
+        rm -rf "$WEB_EXTENSIONS_DIR"
+        log "INFO" "  • Freed $SIZE of legacy web assets"
+    fi
+
+    log "INFO" "✅ Legacy web extensions cleanup complete"
+    log "INFO" ""
+}
+
 start_comfyui() {
     log "INFO" "🎨 Starting ComfyUI..."
 
@@ -236,7 +273,11 @@ start_comfyui() {
     log "INFO" "  • Starting with CUDA support"
 
     # Start ComfyUI in background instead of exec (allows trap to work)
-    "$PYBIN" main.py --listen "0.0.0.0" --port "$COMFYUI_PORT" &
+    # ---- ignition flags (env-tunable) ----
+    : "${COMFY_FLAGS:=--preview-method auto --use-sage-attention}"
+    log "INFO" "  • Startup flags: ${COMFY_FLAGS}"
+
+    "$PYBIN" main.py ${COMFY_FLAGS} --listen "0.0.0.0" --port "$COMFYUI_PORT" &
     COMFYUI_PID=$!
 
     # Wait for ComfyUI to actually start (max 30 seconds)
@@ -254,8 +295,7 @@ start_comfyui() {
         exit 5
     fi
 
-    # Wait for ComfyUI to exit
-    wait $COMFYUI_PID
+    log "INFO" ""
 }
 
 # Signal handlers
@@ -322,7 +362,17 @@ main() {
 
     start_filebrowser
     gpu_preflight
+    disable_manager_network
+    remove_manager_web_extensions
     start_comfyui
+
+    log "INFO" "🚀 All services started successfully"
+    log "INFO" "💡 ComfyUI: http://0.0.0.0:$COMFYUI_PORT"
+    log "INFO" "📁 File Browser: http://0.0.0.0:$FILEBROWSER_PORT"
+    log "INFO" ""
+
+    # Wait for ComfyUI to exit
+    wait $COMFYUI_PID
 }
 
 main "$@"

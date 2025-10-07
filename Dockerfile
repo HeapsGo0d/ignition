@@ -62,6 +62,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         opencv-python \
         psutil
 
+# Install SAGE Attention for performance optimization
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install sageattention
+
 FROM base AS final
 
 # Final stage setup

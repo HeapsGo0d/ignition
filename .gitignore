@@ -40,3 +40,8 @@ template_inputs.txt
 .pytest_cache/
 *.pyc
 .mypy_cache/
+
+# Backup files from testing
+*.bak
+*.backup
+*~.bak

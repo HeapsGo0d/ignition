@@ -214,6 +214,33 @@ nuke
 
 **Safety**: Nuke only runs automatically if ComfyUI successfully started. Failed startups (GPU errors, download failures, etc.) preserve data for debugging.
 
+## ⚡ Performance Optimizations
+
+This image includes targeted fixes for ComfyUI startup and inference:
+
+**Startup Performance** (5min → instant)
+- Disabled ComfyUI Manager network calls at boot
+- Removed web extension loading overhead
+- Non-blocking initialization
+
+**Inference Performance** (2-5x faster)
+- SAGE Attention support (optional, see `scripts/optional/`)
+- Environment-driven `COMFY_FLAGS` for customization
+
+**Customization Examples**:
+```bash
+# Low VRAM mode (for cards with limited memory)
+export COMFY_FLAGS="--lowvram --use-sage-attention"
+
+# Disable SAGE temporarily (troubleshooting)
+export COMFY_FLAGS="--preview-method auto"
+
+# Minimal flags (fastest startup, testing)
+export COMFY_FLAGS=""
+```
+
+See commit history for deferred optimizations (Phase 2).
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
