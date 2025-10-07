@@ -245,6 +245,22 @@ EOF
     log "INFO" ""
 }
 
+remove_manager_web_extensions() {
+    log "INFO" "🚀 Removing legacy ComfyUI-Manager web extensions..."
+
+    local WEB_EXTENSIONS_DIR="$COMFYUI_ROOT/web/extensions/ComfyUI-Manager"
+
+    if [[ -d "$WEB_EXTENSIONS_DIR" ]]; then
+        SIZE=$(du -sh "$WEB_EXTENSIONS_DIR" 2>/dev/null | cut -f1 || echo "unknown")
+        log "INFO" "  • Removing legacy web extensions ($SIZE)"
+        rm -rf "$WEB_EXTENSIONS_DIR"
+        log "INFO" "  • Freed $SIZE of legacy web assets"
+    fi
+
+    log "INFO" "✅ Legacy web extensions cleanup complete"
+    log "INFO" ""
+}
+
 start_comfyui() {
     log "INFO" "🎨 Starting ComfyUI..."
 
@@ -349,6 +365,7 @@ main() {
     start_filebrowser
     gpu_preflight
     disable_manager_network
+    remove_manager_web_extensions
     start_comfyui
 }
 

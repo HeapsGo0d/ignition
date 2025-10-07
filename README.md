@@ -184,7 +184,7 @@ Ignition includes basic privacy protection for telemetry blocking and connection
 
 **Automatic Setup**: Privacy protection activates automatically on container start before any model downloads occur.
 
-**ComfyUI-Manager**: Configured with `network_mode = offline` to prevent external connections and ensure instant web UI loading. Manager uses local cache only.
+**ComfyUI-Manager**: Configured with `network_mode = offline` to prevent external connections. Legacy web extensions in `/web/extensions/ComfyUI-Manager` are automatically removed on startup to eliminate duplicate payloads and ensure instant UI loading (modern Manager loads JS directly from `custom_nodes/`).
 
 ### 💣 Nuclear Cleanup (Nuke)
 
