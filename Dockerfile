@@ -41,10 +41,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install pyyaml gdown
 
 # Install ComfyUI directly (more reliable than comfy-cli)
-# Filter out torch packages to prevent downgrade from nightly
+# Filter out torch packages to prevent downgrade from nightly (but keep torchsde)
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     cd /workspace/ComfyUI && \
-    grep -v "^torch" requirements.txt | pip install --no-cache-dir -r /dev/stdin
+    grep -v "^torch$" requirements.txt | \
+    grep -v "^torchvision$" | \
+    grep -v "^torchaudio$" | \
+    pip install --no-cache-dir -r /dev/stdin
 
 # Install ComfyUI-Manager for custom node management
 RUN cd /workspace/ComfyUI/custom_nodes && \
