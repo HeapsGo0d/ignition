@@ -233,7 +233,7 @@ disable_manager_network() {
     cat > "$MANAGER_DIR/config.ini" << 'EOF'
 [default]
 preview_method = none
-network_mode = private
+network_mode = offline
 git_exe =
 use_uv = True
 channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main

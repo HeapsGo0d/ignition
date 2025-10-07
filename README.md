@@ -184,7 +184,7 @@ Ignition includes basic privacy protection for telemetry blocking and connection
 
 **Automatic Setup**: Privacy protection activates automatically on container start before any model downloads occur.
 
-**Known Issue (ComfyUI-Manager V3.30+)**: The Manager may still fetch registry data on startup despite `network_mode = private` config. This is a known Manager bug being fixed upstream. The fetch runs in the background and doesn't block ComfyUI functionality.
+**ComfyUI-Manager**: Configured with `network_mode = offline` to prevent external connections and ensure instant web UI loading. Manager uses local cache only.
 
 ### 💣 Nuclear Cleanup (Nuke)
 
