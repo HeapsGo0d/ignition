@@ -56,17 +56,10 @@ Storage: Ephemeral volume (0GB; models redownload each start) (Container: 200GB 
 ## Startup Process
 
 1. 🔍 System check
-2. 💾 Storage setup
+2. 💾 Storage setup  
 3. 📥 Model downloads (parallel)
 4. 📁 File browser start (port 8080)
-5. 🚀 nginx setup (auto-detects frontend path, generates config)
-6. 🎨 ComfyUI start (port 8188)
-
-### nginx Self-Healing
-- Automatically detects Python frontend path at runtime
-- Generates nginx config with correct paths dynamically
-- Creates pre-compressed .gz files if missing
-- Works with any Python version (no hardcoded paths)
+5. 🎨 ComfyUI start (port 8188)
 
 ## Troubleshooting
 

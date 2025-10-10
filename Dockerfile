@@ -71,7 +71,8 @@ RUN FRONTEND_PATH=$(python3 -c "import comfyui_frontend_package; import importli
 # Install nginx for static asset serving with compression
 RUN apt-get update && apt-get install -y --no-install-recommends nginx && \
     rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /etc/nginx/sites-{available,enabled}
+    mkdir -p /etc/nginx/sites-{available,enabled} && \
+    sed -i 's/worker_processes auto;/worker_processes 4;/' /etc/nginx/nginx.conf
 
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
