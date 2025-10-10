@@ -1,13 +1,19 @@
 {
-  "name": "Ignition ComfyUI v3.2.4-refined",
+  "name": "Ignition ComfyUI v3.2.2-nginx-optimization",
   "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace - Performance optimized with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.2.4-refined",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.2.2-nginx-optimization",
   "ports": [
+    {
+      "privatePort": 8081,
+      "publicPort": 8081,
+      "type": "http",
+      "description": "ComfyUI (Optimized - nginx with compression)"
+    },
     {
       "privatePort": 8188,
       "publicPort": 8188,
       "type": "http",
-      "description": "ComfyUI Web Interface"
+      "description": "ComfyUI (Direct - Python server)"
     },
     {
       "privatePort": 8080,
@@ -25,7 +31,7 @@
   "environmentVariables": [
     {
       "key": "CIVITAI_MODELS",
-      "value": "450105",
+      "value": "1569593,919063,450105",
       "description": "Comma-separated CivitAI model version IDs"
     },
     {

@@ -19,6 +19,7 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 **Frontend Loading:**
 - Pre-compressed static assets (gzip) for 80%+ size reduction
 - nginx reverse proxy with aggressive browser caching
+- **Self-healing nginx** - auto-detects Python paths at runtime
 - **Load time improvement: 167s → 15-25s** (7-10x faster)
 - Instant subsequent loads via browser cache
 
@@ -31,6 +32,7 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 - 3MB compressed assets delivered
 - 15-25 second initial load
 - Instant cached loads thereafter
+- Works with any Python version (no hardcoded paths)
 
 ## 🎯 Supported Model Sources
 

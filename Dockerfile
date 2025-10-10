@@ -111,11 +111,8 @@ RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh
 COPY scripts/nuke /usr/local/bin/nuke
 RUN chmod +x /usr/local/bin/nuke
 
-# Copy nginx configuration
-COPY scripts/nginx-comfyui.conf /etc/nginx/sites-available/comfyui
-RUN ln -sf /etc/nginx/sites-available/comfyui /etc/nginx/sites-enabled/default && \
-    rm -f /etc/nginx/sites-enabled/default.bak && \
-    nginx -t
+# Copy nginx configuration template (will be generated at runtime with correct paths)
+COPY scripts/nginx-comfyui.conf.template /workspace/scripts/
 
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""

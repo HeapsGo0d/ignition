@@ -266,6 +266,55 @@ start_nginx() {
     log "INFO" "   → Serves pre-compressed frontend (80%+ size reduction)"
     log "INFO" "   → Backend API on port 8188 (still accessible)"
 
+    # Detect frontend path dynamically
+    log "INFO" "  • Detecting frontend path..."
+    FRONTEND_PATH=$("$PYBIN" -c "
+import comfyui_frontend_package
+import importlib.resources
+try:
+    path = importlib.resources.files(comfyui_frontend_package) / 'static'
+    print(path)
+except Exception as e:
+    import sys
+    print('', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null)
+
+    if [[ $? -ne 0 ]] || [[ -z "$FRONTEND_PATH" ]] || [[ ! -d "$FRONTEND_PATH" ]]; then
+        log "WARN" "⚠️  Could not detect frontend path"
+        log "WARN" "   → ComfyUI will run on port 8188 without nginx optimization"
+        log "INFO" ""
+        return
+    fi
+
+    log "INFO" "  • Frontend: $FRONTEND_PATH"
+
+    # Ensure pre-compressed files exist
+    GZ_COUNT=$(find "$FRONTEND_PATH" -name "*.gz" 2>/dev/null | wc -l)
+    if [[ $GZ_COUNT -eq 0 ]]; then
+        log "INFO" "  • Creating pre-compressed files..."
+        find "$FRONTEND_PATH" -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" \) \
+            ! -name "*.map" ! -name "*.gz" \
+            -exec gzip -k9 {} \; 2>/dev/null || true
+        NEW_GZ_COUNT=$(find "$FRONTEND_PATH" -name "*.gz" 2>/dev/null | wc -l)
+        log "INFO" "  • Created $NEW_GZ_COUNT compressed files"
+    fi
+
+    # Generate nginx config from template
+    log "INFO" "  • Generating nginx configuration..."
+    if [[ ! -f "$SCRIPT_DIR/nginx-comfyui.conf.template" ]]; then
+        log "WARN" "⚠️  Template not found: $SCRIPT_DIR/nginx-comfyui.conf.template"
+        log "WARN" "   → ComfyUI will run on port 8188 without nginx optimization"
+        log "INFO" ""
+        return
+    fi
+
+    sed "s|__FRONTEND_PATH__|$FRONTEND_PATH|g" \
+        "$SCRIPT_DIR/nginx-comfyui.conf.template" > /etc/nginx/sites-available/comfyui
+
+    # Enable site
+    ln -sf /etc/nginx/sites-available/comfyui /etc/nginx/sites-enabled/default 2>/dev/null || true
+
     # Test nginx configuration
     if nginx -t 2>&1 | grep -q "successful"; then
         # Start nginx
@@ -273,7 +322,7 @@ start_nginx() {
 
         # Verify it's running
         sleep 1
-        if curl -sf http://127.0.0.1:8081/ >/dev/null 2>&1; then
+        if curl -sf http://127.0.0.1:8081/nginx-health >/dev/null 2>&1; then
             log "INFO" "✅ nginx started successfully"
             log "INFO" "   → Access ComfyUI: http://[pod-id]-8081.proxy.runpod.net"
             log "INFO" "   → Direct API: http://[pod-id]-8188.proxy.runpod.net (optional)"

@@ -1,0 +1,125 @@
+# ComfyUI nginx reverse proxy with pre-compressed static asset serving
+# Reduces frontend load time from ~167s to ~15-25s (7-10x improvement)
+# Template: __FRONTEND_PATH__ will be substituted at runtime
+
+upstream comfyui_backend {
+    server 127.0.0.1:8188;
+    keepalive 32;
+}
+
+server {
+    listen 8081 default_server;
+    server_name _;
+
+    # Allow large file uploads (models, images)
+    client_max_body_size 100M;
+    client_body_buffer_size 1M;
+
+    # Logging for diagnostics
+    access_log /var/log/nginx/comfyui_access.log;
+    error_log /var/log/nginx/comfyui_error.log warn;
+
+    # Health check endpoint
+    location /nginx-health {
+        access_log off;
+        return 200 "nginx operational\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Serve pre-compressed static assets from comfyui-frontend-package
+    location ~ ^/(assets|cursor|extensions|fonts|scripts)/ {
+        root __FRONTEND_PATH__;
+
+        # Serve pre-compressed .gz files when available
+        gzip_static on;
+
+        # Runtime gzip compression fallback
+        gzip on;
+        gzip_vary on;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+        gzip_min_length 1000;
+
+        # Aggressive caching for hashed filenames (immutable)
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+
+        # Security headers
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+
+        # Fallback to proxy if not found
+        try_files $uri @proxy;
+    }
+
+    # Root files (index.html, CSS) - shorter cache for updates
+    location ~ ^/(index\.html|materialdesignicons\.min\.css)$ {
+        root __FRONTEND_PATH__;
+
+        gzip_static on;
+        gzip on;
+
+        # Short cache allows frontend updates
+        expires 5m;
+        add_header Cache-Control "public, max-age=300" always;
+
+        # Fallback to proxy if not found
+        try_files $uri @proxy;
+    }
+
+    # Root path - serve index.html or proxy
+    location = / {
+        root __FRONTEND_PATH__;
+        try_files /index.html @proxy;
+    }
+
+    # Named location for proxy fallback
+    location @proxy {
+        proxy_pass http://comfyui_backend;
+        proxy_http_version 1.1;
+
+        # WebSocket support for real-time updates
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Long timeouts for generation tasks
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
+
+        # Disable buffering for SSE/streaming responses
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # Proxy all other requests to ComfyUI Python server
+    location / {
+        proxy_pass http://comfyui_backend;
+        proxy_http_version 1.1;
+
+        # WebSocket support for real-time updates
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Long timeouts for generation tasks
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
+
+        # Disable buffering for SSE/streaming responses
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
