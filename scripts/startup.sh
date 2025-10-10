@@ -302,6 +302,7 @@ except Exception as e:
 
     # Generate nginx config from template
     log "INFO" "  • Generating nginx configuration..."
+    log "INFO" "  • nginx workers: $(grep worker_processes /etc/nginx/nginx.conf | awk '{print $2}' | tr -d ';')"
     if [[ ! -f "$SCRIPT_DIR/nginx-comfyui.conf.template" ]]; then
         log "WARN" "⚠️  Template not found: $SCRIPT_DIR/nginx-comfyui.conf.template"
         log "WARN" "   → ComfyUI will run on port 8188 without nginx optimization"
