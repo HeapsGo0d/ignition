@@ -36,7 +36,7 @@ FLUX_MODELS = {
         'subdir': 'text_encoders'
     },
     'ae': {
-        'url': 'https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors',
+        'url': 'https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors',
         'filename': 'ae.safetensors',
         'subdir': 'vae'
     },

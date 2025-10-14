@@ -14,8 +14,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.3.0-clean"
-TEMPLATE_NAME="Ignition ComfyUI v3.3.0-clean"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.3.1-clean"
+TEMPLATE_NAME="Ignition ComfyUI v3.3.1-clean"
 TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace - Simple, elegant, functional with RTX 5090 support"
 
 # Disk defaults (can be overridden interactively or via env)

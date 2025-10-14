@@ -61,7 +61,7 @@ Alternatively, set these environment variables manually in your RunPod template:
 ```bash
 # Required: Specify models to download
 CIVITAI_MODELS="123456,789012,345678"
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev,stabilityai/stable-diffusion-xl-base-1.0"
+HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae"
 
 # Optional: API tokens for authentication
 CIVITAI_TOKEN="your_civitai_api_token_here"
@@ -317,7 +317,7 @@ docker build -t ignition-comfyui:dev .
 python3 scripts/download_civitai.py --models "123456" --token "your_token"
 
 # Test HuggingFace downloader
-python3 scripts/download_huggingface.py --repos "black-forest-labs/FLUX.1-dev"
+python3 scripts/download_huggingface_simple.py flux1-dev,clip_l,ae
 ```
 
 ## 🔐 Security Notes
