@@ -289,6 +289,37 @@ nuke
 
 **Safety**: Nuke only runs automatically if ComfyUI successfully started. Failed startups (GPU errors, download failures, etc.) preserve data for debugging.
 
+## 📟 SSH Command Reference
+
+Quick reference for common operations via SSH:
+
+```bash
+# Restart ComfyUI (preserves models)
+/workspace/scripts/restart-comfyui.sh
+
+# Stop pod with cleanup (deletes all data)
+/workspace/scripts/stop-pod.sh
+
+# Manual nuclear cleanup
+nuke
+
+# View connection monitoring logs
+/workspace/scripts/privacy/show-connections.sh
+
+# Check ComfyUI status
+curl http://localhost:8188/
+
+# View startup logs
+tail -f /tmp/ignition_startup.log
+
+# Check what's being blocked
+cat /etc/hosts | grep -A 1 "Ignition"
+
+# List downloaded models
+ls -lh /workspace/ComfyUI/models/checkpoints/
+ls -lh /workspace/ComfyUI/models/diffusion_models/
+```
+
 ## ⚡ Performance Optimizations
 
 This image includes targeted fixes for ComfyUI startup and inference:
