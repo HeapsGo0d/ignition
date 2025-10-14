@@ -1,16 +1,31 @@
 #!/bin/bash
 # Nuclear cleanup: delete all user data and models
 echo "💣 NUKE: Deleting all user data and models..."
-shopt -s nullglob
+shopt -s nullglob dotglob
 
-# PHASE 1: ESSENTIAL USER DATA
-rm -rf /workspace/ComfyUI/user/* /workspace/ComfyUI/input/* /workspace/ComfyUI/output/*
-rm -rf /root/.bash_history /root/.cache/* /tmp/* /workspace/ComfyUI/temp/*
+# Helper: best-effort deletion
+wipe() {
+  for p in "$@"; do
+    [ -e "$p" ] && rm -rf "$p" 2>/dev/null || true
+  done
+}
 
-# PHASE 2: ABSOLUTE PARANOIA
-rm -rf /root/.local/share/* /root/.config/* /var/tmp/*
+# PHASE 1: Histories & Temp (instant)
+echo "  • Clearing histories and temp files..."
+wipe /root/.bash_history /root/.python_history /tmp/* /var/tmp/* /workspace/ComfyUI/temp/*
 
-# PHASE 3: APPLICATION DATA & MODELS
-rm -rf /workspace/ComfyUI/logs/* /workspace/ComfyUI/models/*
+# PHASE 2: User Data (fast)
+echo "  • Removing user workflows and outputs..."
+wipe /workspace/ComfyUI/user/* /workspace/ComfyUI/input/* /workspace/ComfyUI/output/* \
+     /workspace/ComfyUI/logs/* /workspace/ComfyUI/custom_nodes/*/cache* \
+     /workspace/ComfyUI/custom_nodes/*/history* /workspace/ComfyUI/custom_nodes/*/*.db
+
+# PHASE 3: Caches (medium - includes custom nodes, pip, Python bytecode via .cache/.local)
+echo "  • Purging caches and application data..."
+wipe /root/.cache/* /root/.local/share/* /root/.config/* /workspace/.cache/*
+
+# PHASE 4: Models (slow - ~20-30s)
+echo "  • Deleting models..."
+wipe /workspace/ComfyUI/models/*
 
 echo "✅ Nuclear cleanup complete"
