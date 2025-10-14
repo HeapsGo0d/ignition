@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v3.4.0-supervisor",
+  "name": "Ignition ComfyUI v3.4.1-supervisor",
   "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.4.0-supervisor",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.4.1-supervisor",
   "ports": [
     {
       "privatePort": 8188,
