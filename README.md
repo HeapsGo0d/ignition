@@ -7,6 +7,8 @@ Ignition is a RunPod-optimized Docker container that automatically downloads and
 ## ✨ Features
 
 - **🎨 Dynamic Model Loading**: Specify models via environment variables, download on startup
+- **🔄 Safe Restart Architecture**: Supervisor loop enables in-place restarts without data loss
+- **🎛️ Runtime Manager UI Toggle**: Enable/disable ComfyUI-Manager UI without rebuilding
 - **⚡ Parallel Downloads**: Efficient concurrent downloading from multiple sources
 - **🔒 Atomic File Operations**: Robust download → verify → move → cleanup process prevents corruption
 - **💾 Persistent Storage Support**: Optional persistent model storage to survive container restarts
@@ -102,6 +104,7 @@ docker run -d \
 | `FILEBROWSER_PASSWORD` | File browser password | `"runpod"` | `"secure_password"` |
 | `COMFYUI_PORT` | ComfyUI web interface port | `"8188"` | `"8188"` |
 | `FILEBROWSER_PORT` | File browser port | `"8080"` | `"8080"` |
+| `ENABLE_MANAGER_UI` | Enable ComfyUI-Manager UI | `"false"` | `"true"` or `"false"` |
 
 ## 📁 File Organization
 
@@ -166,6 +169,78 @@ COMFYUI_PORT="3000"
 FILEBROWSER_PORT="3001"
 ```
 
+## 🔄 Restarting ComfyUI
+
+Ignition includes a supervisor loop architecture for safe restarts without data loss:
+
+### Soft Restart (Models Preserved)
+SSH into your pod and run:
+```bash
+/workspace/scripts/restart-comfyui.sh
+```
+
+**What happens:**
+- ComfyUI process stops
+- Supervisor automatically restarts it in 2 seconds
+- All models and data remain intact
+- Container keeps running
+
+**Use cases:**
+- Apply custom node changes
+- Reload workflows
+- Recover from ComfyUI errors
+- Toggle Manager UI (see below)
+
+### Hard Stop (Triggers Nuke)
+SSH into your pod and run:
+```bash
+/workspace/scripts/stop-pod.sh
+```
+
+**What happens:**
+- ComfyUI process stops
+- Supervisor loop exits
+- Container exits
+- Nuclear cleanup runs (all data deleted)
+
+**Use cases:**
+- Complete pod shutdown
+- Fresh start needed
+- End of session
+
+### Behavior Table
+
+| Action | Command | ComfyUI | Models | Container | Nuke |
+|--------|---------|---------|--------|-----------|------|
+| **Soft Restart** | `restart-comfyui.sh` | Restarts | ✅ Preserved | Running | ❌ No |
+| **Hard Stop** | `stop-pod.sh` | Stops | ❌ Deleted | Exits | ✅ Yes |
+| **Crash** | *(automatic)* | Auto-restarts | ✅ Preserved | Running | ❌ No |
+
+## 🎛️ Manager UI Toggle
+
+ComfyUI-Manager UI can be enabled/disabled at runtime without rebuilding the image:
+
+### Default: Disabled (Instant Loads)
+```bash
+ENABLE_MANAGER_UI="false"  # Default
+```
+- ComfyUI loads instantly (~1-2s)
+- Manager backend still installed
+- No browser UI for custom nodes
+
+### Enable: Manager UI Available
+```bash
+ENABLE_MANAGER_UI="true"
+```
+- ComfyUI loads in ~3-5s (+2-3s overhead)
+- Full Manager UI in browser
+- Install/manage custom nodes visually
+
+**To toggle after deployment:**
+1. Update environment variable in RunPod
+2. Run soft restart: `/workspace/scripts/restart-comfyui.sh`
+3. Manager UI will be enabled/disabled on next load
+
 ### 🔒 Privacy Lite
 
 Ignition includes basic privacy protection for telemetry blocking and connection monitoring.
@@ -188,7 +263,7 @@ Ignition includes basic privacy protection for telemetry blocking and connection
 
 Ignition includes a nuclear cleanup feature that **deletes all user data and models** for a fresh start.
 
-**Automatic**: Runs on clean pod shutdown (after successful ComfyUI start)
+**Automatic**: Runs only on hard stop (not on restarts or crashes)
 ```bash
 # Stop your pod normally - nuke runs automatically
 # Next start will be completely fresh

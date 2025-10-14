@@ -55,10 +55,6 @@ RUN cd /workspace/ComfyUI/custom_nodes && \
     cd ComfyUI-Manager && \
     pip install --no-cache-dir -r requirements.txt
 
-# Remove Manager JS bloat for instant UI loads
-RUN rm -rf /workspace/ComfyUI/custom_nodes/ComfyUI-Manager/js/ && \
-    echo "✅ Removed Manager UI bloat - instant loads enabled"
-
 # Install additional dependencies for Ignition
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install \
@@ -91,7 +87,8 @@ RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh |
 
 # Copy our scripts
 COPY scripts/ /workspace/scripts/
-RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh
+RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh && \
+    chmod +x /workspace/scripts/restart-comfyui.sh /workspace/scripts/stop-pod.sh
 
 # Install nuke script for nuclear cleanup
 COPY scripts/nuke /usr/local/bin/nuke

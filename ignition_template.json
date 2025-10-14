@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v3.3.1-clean",
-  "description": "Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.3.1-clean",
+  "name": "Ignition ComfyUI Latest",
+  "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
+  "dockerImage": "heapsgo0d/ignition-comfyui:latest",
   "ports": [
     {
       "privatePort": 8188,
@@ -25,7 +25,7 @@
   "environmentVariables": [
     {
       "key": "CIVITAI_MODELS",
-      "value": "450105",
+      "value": "1569593,919063,450105",
       "description": "Comma-separated CivitAI model version IDs"
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "key": "HUGGINGFACE_MODELS", 
-      "value": "flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev",
+      "value": "runpod",
       "description": "Comma-separated HuggingFace repository names"
     },
     {
@@ -75,8 +75,13 @@
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "ENABLE_MANAGER_UI",
+      "value": "false",
+      "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"

@@ -60,6 +60,42 @@ Storage: Ephemeral volume (0GB; models redownload each start) (Container: 200GB 
 4. 📁 File browser start (port 8080)
 5. 🎨 ComfyUI start (port 8188)
 
+## 🔄 Restarting ComfyUI
+
+Ignition includes supervisor architecture for safe restarts:
+
+### Soft Restart (Models Preserved)
+```bash
+/workspace/scripts/restart-comfyui.sh
+```
+- Restarts ComfyUI in 2 seconds
+- All models and data preserved
+- Container keeps running
+- Use for: applying changes, toggling Manager UI
+
+### Hard Stop (Triggers Nuke)
+```bash
+/workspace/scripts/stop-pod.sh
+```
+- Exits container completely
+- Nuclear cleanup deletes all data
+- Use for: complete shutdown, fresh start
+
+| Action | Models | Container | Nuke |
+|--------|--------|-----------|------|
+| Soft Restart | ✅ Preserved | Running | ❌ No |
+| Hard Stop | ❌ Deleted | Exits | ✅ Yes |
+| Crash | ✅ Preserved | Running | ❌ No |
+
+## 🎛️ Manager UI Toggle
+
+Control ComfyUI-Manager UI at runtime:
+
+- `ENABLE_MANAGER_UI=false` (default): Instant loads (~1-2s)
+- `ENABLE_MANAGER_UI=true`: Manager UI available (+2-3s load time)
+
+**To toggle**: Update env var in RunPod, then run soft restart
+
 ## Troubleshooting
 
 ### Logs
@@ -70,6 +106,7 @@ Storage: Ephemeral volume (0GB; models redownload each start) (Container: 200GB 
 - **No models downloading**: Check model IDs are correct
 - **Out of space**: Use persistent storage or smaller models
 - **Slow downloads**: Add API tokens for authentication
+- **ComfyUI not responding**: Run `/workspace/scripts/restart-comfyui.sh`
 
 ---
 **🚀 Ready to create amazing AI art with Ignition!**

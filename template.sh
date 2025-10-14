@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.3.1-clean"
-TEMPLATE_NAME="Ignition ComfyUI v3.3.1-clean"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with runtime model downloads from CivitAI and HuggingFace - Simple, elegant, functional with RTX 5090 support"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.4.0-supervisor"
+TEMPLATE_NAME="Ignition ComfyUI v3.4.0-supervisor"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
@@ -259,8 +259,13 @@ generate_template() {
     },
     {
       "key": "FILEBROWSER_PORT",
-      "value": "8080", 
+      "value": "8080",
       "description": "File browser port"
+    },
+    {
+      "key": "ENABLE_MANAGER_UI",
+      "value": "false",
+      "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
@@ -365,6 +370,42 @@ Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_
 4. 📁 File browser start (port 8080)
 5. 🎨 ComfyUI start (port 8188)
 
+## 🔄 Restarting ComfyUI
+
+Ignition includes supervisor architecture for safe restarts:
+
+### Soft Restart (Models Preserved)
+\`\`\`bash
+/workspace/scripts/restart-comfyui.sh
+\`\`\`
+- Restarts ComfyUI in 2 seconds
+- All models and data preserved
+- Container keeps running
+- Use for: applying changes, toggling Manager UI
+
+### Hard Stop (Triggers Nuke)
+\`\`\`bash
+/workspace/scripts/stop-pod.sh
+\`\`\`
+- Exits container completely
+- Nuclear cleanup deletes all data
+- Use for: complete shutdown, fresh start
+
+| Action | Models | Container | Nuke |
+|--------|--------|-----------|------|
+| Soft Restart | ✅ Preserved | Running | ❌ No |
+| Hard Stop | ❌ Deleted | Exits | ✅ Yes |
+| Crash | ✅ Preserved | Running | ❌ No |
+
+## 🎛️ Manager UI Toggle
+
+Control ComfyUI-Manager UI at runtime:
+
+- \`ENABLE_MANAGER_UI=false\` (default): Instant loads (~1-2s)
+- \`ENABLE_MANAGER_UI=true\`: Manager UI available (+2-3s load time)
+
+**To toggle**: Update env var in RunPod, then run soft restart
+
 ## Troubleshooting
 
 ### Logs
@@ -375,6 +416,7 @@ Storage: $(make_storage_note) (Container: ${CONTAINER_DISK_GB}GB disk, ${VOLUME_
 - **No models downloading**: Check model IDs are correct
 - **Out of space**: Use persistent storage or smaller models
 - **Slow downloads**: Add API tokens for authentication
+- **ComfyUI not responding**: Run \`/workspace/scripts/restart-comfyui.sh\`
 
 ---
 **🚀 Ready to create amazing AI art with Ignition!**
@@ -416,7 +458,8 @@ deploy_template() {
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
-    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
+    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
+    {"key": "ENABLE_MANAGER_UI", "value": "false"}
   ]
 }
 EOF

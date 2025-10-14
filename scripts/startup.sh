@@ -64,6 +64,7 @@ export FILEBROWSER_PASSWORD="${FILEBROWSER_PASSWORD:-runpod}"
 export COMFYUI_PORT="${COMFYUI_PORT:-8188}"
 export FILEBROWSER_PORT="${FILEBROWSER_PORT:-8080}"
 export FORCE_MODEL_SYNC="${FORCE_MODEL_SYNC:-false}"
+export ENABLE_MANAGER_UI="${ENABLE_MANAGER_UI:-false}"
 
 print_banner() {
     log "INFO" ""
@@ -261,8 +262,33 @@ remove_manager_web_extensions() {
     log "INFO" ""
 }
 
+toggle_manager_ui() {
+    log "INFO" "🔧 Configuring Manager UI..."
+
+    local MANAGER_JS="$COMFYUI_ROOT/custom_nodes/ComfyUI-Manager/js"
+
+    if [[ "${ENABLE_MANAGER_UI:-false}" == "true" ]]; then
+        # Enable Manager UI
+        if [[ -d "$MANAGER_JS.disabled" ]]; then
+            mv "$MANAGER_JS.disabled" "$MANAGER_JS"
+            log "INFO" "✅ Manager UI enabled (+2-3s load time)"
+        elif [[ -d "$MANAGER_JS" ]]; then
+            log "INFO" "✅ Manager UI already enabled"
+        fi
+    else
+        # Disable Manager UI (default - instant loads)
+        if [[ -d "$MANAGER_JS" ]]; then
+            mv "$MANAGER_JS" "$MANAGER_JS.disabled"
+            log "INFO" "🚀 Manager UI disabled (instant loads)"
+        elif [[ -d "$MANAGER_JS.disabled" ]]; then
+            log "INFO" "🚀 Manager UI already disabled"
+        fi
+    fi
+    log "INFO" ""
+}
+
 start_comfyui() {
-    log "INFO" "🎨 Starting ComfyUI..."
+    log "INFO" "🎨 Starting ComfyUI with supervisor loop..."
 
     if command -v ss >/dev/null 2>&1 && ss -tulpn 2>/dev/null | grep -q ":$COMFYUI_PORT "; then
         log "ERROR" "Port $COMFYUI_PORT already in use"
@@ -272,28 +298,51 @@ start_comfyui() {
     cd "$COMFYUI_ROOT"
     log "INFO" "  • Starting with CUDA support"
 
-    # Start ComfyUI in background instead of exec (allows trap to work)
+    # Remove stale stop marker
+    rm -f /tmp/comfyui.stop
+
     # ---- ignition flags (env-tunable) ----
     : "${COMFY_FLAGS:=--preview-method auto --use-sage-attention}"
     log "INFO" "  • Startup flags: ${COMFY_FLAGS}"
 
-    "$PYBIN" main.py ${COMFY_FLAGS} --listen "0.0.0.0" --port "$COMFYUI_PORT" &
-    COMFYUI_PID=$!
+    # Supervisor loop for safe restarts
+    while true; do
+        log "INFO" "  • Starting ComfyUI process..."
 
-    # Wait for ComfyUI to actually start (max 30 seconds)
-    for i in {1..30}; do
-        if curl -sf http://127.0.0.1:$COMFYUI_PORT/ >/dev/null 2>&1; then
-            COMFYUI_STARTED=true
-            log "INFO" "✅ ComfyUI responding on port $COMFYUI_PORT"
+        "$PYBIN" main.py ${COMFY_FLAGS} --listen "0.0.0.0" --port "$COMFYUI_PORT" &
+        COMFYUI_PID=$!
+
+        # Wait for first successful start
+        if [[ "$COMFYUI_STARTED" != "true" ]]; then
+            for i in {1..30}; do
+                if curl -sf http://127.0.0.1:$COMFYUI_PORT/ >/dev/null 2>&1; then
+                    COMFYUI_STARTED=true
+                    log "INFO" "✅ ComfyUI responding on port $COMFYUI_PORT"
+                    break
+                fi
+                sleep 1
+            done
+
+            if [[ "$COMFYUI_STARTED" != "true" ]]; then
+                log "ERROR" "❌ ComfyUI failed to start within 30 seconds"
+                exit 5
+            fi
+        fi
+
+        # Wait for process exit
+        wait $COMFYUI_PID
+        EXIT_CODE=$?
+
+        # Check for hard stop marker
+        if [[ -f /tmp/comfyui.stop ]]; then
+            log "INFO" "🛑 Hard stop requested - exiting supervisor"
             break
         fi
-        sleep 1
-    done
 
-    if [[ "$COMFYUI_STARTED" != "true" ]]; then
-        log "ERROR" "❌ ComfyUI failed to start within 30 seconds"
-        exit 5
-    fi
+        # Soft restart - continue loop
+        log "INFO" "🔄 ComfyUI exited (code: $EXIT_CODE) - restarting in 2s..."
+        sleep 2
+    done
 
     log "INFO" ""
 }
@@ -363,6 +412,7 @@ main() {
     start_filebrowser
     gpu_preflight
     disable_manager_network
+    toggle_manager_ui
     remove_manager_web_extensions
     start_comfyui
 
@@ -370,9 +420,6 @@ main() {
     log "INFO" "💡 ComfyUI: http://0.0.0.0:$COMFYUI_PORT"
     log "INFO" "📁 File Browser: http://0.0.0.0:$FILEBROWSER_PORT"
     log "INFO" ""
-
-    # Wait for ComfyUI to exit
-    wait $COMFYUI_PID
 }
 
 main "$@"
