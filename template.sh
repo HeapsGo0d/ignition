@@ -14,8 +14,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.4.0-supervisor"
-TEMPLATE_NAME="Ignition ComfyUI v3.4.0-supervisor"
+DOCKER_IMAGE="heapsgo0d/ignition-comfyui:v3.4.1-supervisor"
+TEMPLATE_NAME="Ignition ComfyUI v3.4.1-supervisor"
 TEMPLATE_DESCRIPTION="Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support"
 
 # Disk defaults (can be overridden interactively or via env)
