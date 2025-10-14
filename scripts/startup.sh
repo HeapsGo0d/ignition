@@ -329,8 +329,8 @@ start_comfyui() {
             fi
         fi
 
-        # Wait for process exit
-        wait $COMFYUI_PID
+        # Wait for process exit (but don't let SIGTERM reach us during wait)
+        wait $COMFYUI_PID || true
         EXIT_CODE=$?
 
         # Check for hard stop marker
@@ -414,12 +414,17 @@ main() {
     disable_manager_network
     toggle_manager_ui
     remove_manager_web_extensions
-    start_comfyui
 
     log "INFO" "🚀 All services started successfully"
     log "INFO" "💡 ComfyUI: http://0.0.0.0:$COMFYUI_PORT"
     log "INFO" "📁 File Browser: http://0.0.0.0:$FILEBROWSER_PORT"
     log "INFO" ""
+
+    # Start ComfyUI (this function will not return until hard stop)
+    start_comfyui
+
+    # If we get here, it means hard stop was requested
+    log "INFO" "Supervisor loop exited - shutting down container"
 }
 
 main "$@"

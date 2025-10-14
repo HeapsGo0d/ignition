@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI Latest",
+  "name": "Ignition ComfyUI v3.4.0-supervisor",
   "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:latest",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.4.0-supervisor",
   "ports": [
     {
       "privatePort": 8188,
@@ -25,7 +25,7 @@
   "environmentVariables": [
     {
       "key": "CIVITAI_MODELS",
-      "value": "1569593,919063,450105",
+      "value": "450105",
       "description": "Comma-separated CivitAI model version IDs"
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "key": "HUGGINGFACE_MODELS", 
-      "value": "runpod",
+      "value": "flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev",
       "description": "Comma-separated HuggingFace repository names"
     },
     {
