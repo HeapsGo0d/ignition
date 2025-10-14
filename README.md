@@ -273,6 +273,38 @@ export COMFY_FLAGS="--preview-method auto"
 export COMFY_FLAGS=""
 ```
 
+### Manual Downloads
+
+Add models to a running pod without restarting:
+
+```bash
+# Download a FLUX model (goes to diffusion_models/)
+python3 /workspace/scripts/download_civitai_simple.py \
+  --flux "618692" \
+  --token "$CIVITAI_TOKEN" \
+  --output-dir "/workspace/ComfyUI/models"
+
+# Download multiple FLUX models
+python3 /workspace/scripts/download_civitai_simple.py \
+  --flux "618692,741115" \
+  --token "$CIVITAI_TOKEN" \
+  --output-dir "/workspace/ComfyUI/models"
+
+# Mix different model types in one command
+python3 /workspace/scripts/download_civitai_simple.py \
+  --models "133005" \
+  --loras "135867" \
+  --flux "618692" \
+  --token "$CIVITAI_TOKEN" \
+  --output-dir "/workspace/ComfyUI/models"
+
+# Download from HuggingFace
+python3 /workspace/scripts/download_huggingface_simple.py \
+  black-forest-labs/FLUX.1-schnell
+```
+
+**Note:** The `--flux` flag ensures FLUX models go to `diffusion_models/` alongside your HuggingFace FLUX models.
+
 ## 🔒 Privacy & Cleanup
 
 ### Privacy Lite
