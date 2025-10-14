@@ -41,6 +41,7 @@ BLOCKLIST=(
     "amplitude.com"
     "mixpanel.com"
     "sentry.io"
+    "posthog.com"
 
     # Additional tracking services
     "hotjar.com"

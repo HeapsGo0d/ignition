@@ -17,16 +17,17 @@ fi
 # Append timestamp marker
 echo "--- Snapshot at $TIMESTAMP ---" >> "$LOG_FILE"
 
-# Capture established connections (exclude localhost)
+# Capture established connections (exclude localhost and internal services)
 if command -v ss >/dev/null 2>&1; then
-    ss -tn state established '( dport != :8188 and sport != :8188 )' 2>/dev/null | \
+    ss -tn state established '( dport != :8188 and dport != :8080 and sport != :8188 and sport != :8080 )' 2>/dev/null | \
         grep -v "127.0.0.1" | \
         grep -v "Local Address" >> "$LOG_FILE" 2>&1 || echo "  No external connections" >> "$LOG_FILE"
 else
     netstat -tn 2>/dev/null | \
         grep ESTABLISHED | \
         grep -v "127.0.0.1" | \
-        grep -v ":8188" >> "$LOG_FILE" 2>&1 || echo "  No external connections" >> "$LOG_FILE"
+        grep -v ":8188" | \
+        grep -v ":8080" >> "$LOG_FILE" 2>&1 || echo "  No external connections" >> "$LOG_FILE"
 fi
 
 echo "" >> "$LOG_FILE"
