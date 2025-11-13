@@ -69,8 +69,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         psutil
 
 # Install SAGE Attention for performance optimization
+# Use --no-build-isolation so it can see the already-installed torch
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install sageattention
+    pip install --no-build-isolation sageattention
 
 FROM base AS final
 
