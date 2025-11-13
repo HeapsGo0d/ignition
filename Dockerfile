@@ -70,8 +70,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install SAGE Attention for performance optimization
 # Use --no-build-isolation so it can see the already-installed torch
+# Set TORCH_CUDA_ARCH_LIST for RTX 5090 Blackwell (8.9) and Hopper/Blackwell (9.0)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-build-isolation sageattention
+    TORCH_CUDA_ARCH_LIST="8.9;9.0" pip install --no-build-isolation sageattention
 
 FROM base AS final
 
