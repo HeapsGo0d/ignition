@@ -20,11 +20,11 @@ echo "🔧 Installing curated ComfyUI plugins..."
 # Core plugins (idempotent shallow clones)
 cd "$CNODES"
 
-if [ ! -d "ComfyUI-eSuite" ]; then
-  git clone --depth 1 https://github.com/pythongosssss/ComfyUI-eSuite.git
-  echo "✅ Cloned ComfyUI-eSuite"
+if [ ! -d "ComfyUI-Custom-Scripts" ]; then
+  git clone --depth 1 https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git
+  echo "✅ Cloned ComfyUI-Custom-Scripts"
 fi
-install_reqs_if_any "ComfyUI-eSuite"
+install_reqs_if_any "ComfyUI-Custom-Scripts"
 
 if [ ! -d "ComfyUI-Crystools" ]; then
   git clone --depth 1 https://github.com/crystian/ComfyUI-Crystools.git
@@ -62,7 +62,7 @@ echo "📌 Pinning plugin versions..."
 lock_plugins () {
   (
     cd "$CNODES"
-    for d in ComfyUI-eSuite ComfyUI-Crystools ComfyUI-Various ComfyUI-Impact-Pack comfyui_controlnet_aux; do
+    for d in ComfyUI-Custom-Scripts ComfyUI-Crystools ComfyUI-Various ComfyUI-Impact-Pack comfyui_controlnet_aux; do
       [ -d "$d" ] && echo "$d $(git -C "$d" rev-parse --short HEAD)"
     done
   ) | tee "$COMFY/plugins.lock"
