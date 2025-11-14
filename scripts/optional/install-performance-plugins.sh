@@ -37,6 +37,8 @@ if [ ! -d "comfyui-various" ]; then
   echo "✅ Cloned comfyui-various"
 fi
 install_reqs_if_any "comfyui-various"
+# comfyui-various needs soundfile but doesn't declare it
+python3 -m pip install -q soundfile 2>/dev/null || true
 
 # Optional plugins (env-gated)
 if [ "${ENABLE_IMPACT_PACK:-0}" = "1" ]; then
