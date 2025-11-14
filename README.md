@@ -126,7 +126,7 @@ export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
 **How to enable:**
 ```bash
 # Automatic installation - just set the environment variable in your RunPod template:
-ENABLE_SAGEATTENTION=1
+ENABLE_SAGEATTENTION=true
 
 # Optional: Pin specific version (default is 1.0.6 with prebuilt wheels)
 SAGEATTENTION_VERSION=1.0.6
@@ -136,7 +136,7 @@ SAGEATTENTION_VERSION=1.0.6
 ```
 
 **How it works:**
-- When `ENABLE_SAGEATTENTION=1` is set, SageAttention installs automatically on first startup
+- When `ENABLE_SAGEATTENTION=true` is set, SageAttention installs automatically on first startup
 - Subsequent startups detect it's already installed and enable it immediately
 - No SSH access or manual intervention required
 
@@ -166,7 +166,7 @@ SAGEATTENTION_VERSION=1.0.6
 | `COMFYUI_PORT` | ComfyUI web interface port | `"8188"` | `"8188"` |
 | `FILEBROWSER_PORT` | File browser port | `"8080"` | `"8080"` |
 | `PERSISTENT_STORAGE` | Persistent storage path | `"none"` | `"/workspace/models"` |
-| `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"0"` | `"1"` (after installing) |
+| `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"false"` | `"true"` or `"false"` |
 | `SAGEATTENTION_VERSION` | SAGE Attention version to install | `"1.0.6"` | `"2.2.0"` |
 | `COMFY_FLAGS` | ComfyUI startup flags | `"--preview-method auto"` | `"--lowvram"` |
 
@@ -307,7 +307,7 @@ FILEBROWSER_PORT="3001"
 export COMFY_FLAGS="--lowvram"
 
 # Enable SAGE Attention (after installing via optional script)
-export ENABLE_SAGEATTENTION=1
+export ENABLE_SAGEATTENTION=true
 
 # Custom flags (combine as needed)
 export COMFY_FLAGS="--preview-method auto --lowvram"

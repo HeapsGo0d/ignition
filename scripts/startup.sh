@@ -305,7 +305,7 @@ start_comfyui() {
     : "${COMFY_FLAGS:=--preview-method auto}"
 
     # Conditionally enable SAGE Attention if requested and available
-    if [ "${ENABLE_SAGEATTENTION:-0}" = "1" ]; then
+    if [[ "${ENABLE_SAGEATTENTION:-false}" == "true" ]]; then
         if python3 -c "import sageattention" 2>/dev/null; then
             COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
             log "INFO" "  • SAGE Attention enabled"

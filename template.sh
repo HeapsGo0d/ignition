@@ -269,8 +269,8 @@ generate_template() {
     },
     {
       "key": "ENABLE_SAGEATTENTION",
-      "value": "0",
-      "description": "Enable SAGE Attention optimization (0 = disabled, 1 = auto-install and enable)"
+      "value": "false",
+      "description": "Enable SAGE Attention optimization (false = disabled, true = auto-install and enable)"
     },
     {
       "key": "SAGEATTENTION_VERSION",
@@ -470,7 +470,7 @@ deploy_template() {
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
     {"key": "ENABLE_MANAGER_UI", "value": "false"},
-    {"key": "ENABLE_SAGEATTENTION", "value": "0"},
+    {"key": "ENABLE_SAGEATTENTION", "value": "false"},
     {"key": "SAGEATTENTION_VERSION", "value": "1.0.6"}
   ]
 }
