@@ -266,6 +266,16 @@ generate_template() {
       "key": "ENABLE_MANAGER_UI",
       "value": "false",
       "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
+    },
+    {
+      "key": "ENABLE_SAGEATTENTION",
+      "value": "0",
+      "description": "Enable SAGE Attention optimization (0 = disabled, 1 = auto-install and enable)"
+    },
+    {
+      "key": "SAGEATTENTION_VERSION",
+      "value": "1.0.6",
+      "description": "SAGE Attention version to install (default: 1.0.6 with prebuilt wheels)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
@@ -459,7 +469,9 @@ deploy_template() {
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
-    {"key": "ENABLE_MANAGER_UI", "value": "false"}
+    {"key": "ENABLE_MANAGER_UI", "value": "false"},
+    {"key": "ENABLE_SAGEATTENTION", "value": "0"},
+    {"key": "SAGEATTENTION_VERSION", "value": "1.0.6"}
   ]
 }
 EOF
