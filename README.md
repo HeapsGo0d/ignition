@@ -150,6 +150,39 @@ SAGEATTENTION_VERSION=1.0.6
 - Version 2.2.0+ requires building from source (slower, may fail on some systems)
 - Not all models benefit equally - test with your specific workflows
 
+### SAGE Attention 3 for Blackwell GPUs (RTX 5090)
+
+**🧪 Experimental Python 3.13 variant with SageAttention3**
+
+For RTX 5090 and other Blackwell GPUs, use the specialized SA3 image variant:
+
+**Docker Image:**
+```bash
+heapsgo0d/ignition-comfyui:v3.6.0-sa3
+```
+
+**What's different:**
+- Python 3.13 (vs 3.11 in standard image)
+- SageAttention3 pre-installed (optimized for Blackwell)
+- Lossless 2-5x speedup for FLUX, SD3.5, CogVideoX, HunyuanVideo
+
+**How to deploy:**
+1. Use `ignition_template_sa3.json` template
+2. Or manually select Docker image: `heapsgo0d/ignition-comfyui:v3.6.0-sa3`
+3. Set `ENABLE_SAGEATTENTION3=true` (enabled by default in SA3 image)
+
+**Compatible models:**
+- ✅ Flux (image generation)
+- ✅ Stable Diffusion 3.5 (image generation)
+- ✅ CogVideoX-2B (video generation)
+- ✅ HunyuanVideo (video generation)
+- ✅ Mochi (video generation)
+
+**Building your own wheel:**
+See `docs/BUILDING_SAGEATTENTION3.md` for instructions on building SageAttention3 from source.
+
+**Note:** This is a separate image variant. For non-Blackwell GPUs or Python 3.11 compatibility, use the standard image with SageAttention2.
+
 ## 📋 Environment Variables
 
 | Variable | Description | Default | Example |

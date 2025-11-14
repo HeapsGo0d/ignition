@@ -1,0 +1,98 @@
+{
+  "name": "Ignition ComfyUI v3.6.0-sa3 (SageAttention3 Blackwell)",
+  "description": "ComfyUI with SageAttention3 for Blackwell GPUs (RTX 5090) - Python 3.13 variant with lossless 2-5x speedup",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.6.0-sa3",
+  "ports": [
+    {
+      "privatePort": 8188,
+      "publicPort": 8188,
+      "type": "http",
+      "description": "ComfyUI Web Interface"
+    },
+    {
+      "privatePort": 8080,
+      "publicPort": 8080,
+      "type": "http",
+      "description": "File Browser"
+    }
+  ],
+  "volumeMounts": [
+    {
+      "containerPath": "/workspace",
+      "name": "workspace"
+    }
+  ],
+  "environmentVariables": [
+    {
+      "key": "CIVITAI_MODELS",
+      "value": "1569593,919063,450105",
+      "description": "Comma-separated CivitAI model version IDs"
+    },
+    {
+      "key": "CIVITAI_LORAS",
+      "value": "182404,445135,86788,565308",
+      "description": "Comma-separated CivitAI LoRA model version IDs"
+    },
+    {
+      "key": "CIVITAI_VAES",
+      "value": "1674314",
+      "description": "Comma-separated CivitAI VAE model version IDs"
+    },
+    {
+      "key": "CIVITAI_FLUX",
+      "value": "153568",
+      "description": "Comma-separated CivitAI FLUX model version IDs"
+    },
+    {
+      "key": "HUGGINGFACE_MODELS",
+      "value": "flux1-dev,clip_l,t5xxl_fp16,ae,flux1-krea-dev",
+      "description": "Comma-separated HuggingFace repository names"
+    },
+    {
+      "key": "CIVITAI_TOKEN",
+      "value": "",
+      "description": "CivitAI API token (optional, for faster downloads)"
+    },
+    {
+      "key": "HF_TOKEN",
+      "value": "",
+      "description": "HuggingFace API token (optional, for private repos)"
+    },
+    {
+      "key": "PERSISTENT_STORAGE",
+      "value": "",
+      "description": "Persistent storage path or 'none'"
+    },
+    {
+      "key": "FILEBROWSER_PASSWORD",
+      "value": "runpod",
+      "description": "Password for file browser access"
+    },
+    {
+      "key": "COMFYUI_PORT",
+      "value": "8188",
+      "description": "ComfyUI web interface port"
+    },
+    {
+      "key": "FILEBROWSER_PORT",
+      "value": "8080",
+      "description": "File browser port"
+    },
+    {
+      "key": "ENABLE_MANAGER_UI",
+      "value": "false",
+      "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
+    },
+    {
+      "key": "ENABLE_SAGEATTENTION3",
+      "value": "true",
+      "description": "Enable SAGE Attention 3 for Blackwell GPUs (true = enabled by default in this image)"
+    },
+    {
+      "key": "SAGEATTENTION3_WHEEL_URL",
+      "value": "https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl",
+      "description": "SageAttention3 wheel URL (pre-configured for this release)"
+    }
+  ],
+  "startScript": "bash /workspace/scripts/startup.sh"
+}

@@ -320,6 +320,23 @@ start_comfyui() {
         fi
     fi
 
+    # Conditionally enable SAGE Attention 3 if requested and available (Blackwell variant)
+    if [[ "${ENABLE_SAGEATTENTION3:-false}" == "true" ]]; then
+        if python3 -c "from sageattn3 import sageattn3_blackwell" 2>/dev/null; then
+            # SageAttention3 is available for custom nodes
+            export SAGEATTENTION3_ENABLED=1
+            log "INFO" "  • SAGE Attention 3 enabled (for compatible custom nodes)"
+        else
+            log "INFO" "  • SAGE Attention 3 requested, installing automatically..."
+            if /workspace/scripts/optional/install-sageattention3.sh; then
+                export SAGEATTENTION3_ENABLED=1
+                log "INFO" "  • SAGE Attention 3 installed and enabled"
+            else
+                log "WARN" "  • SAGE Attention 3 installation failed, continuing without it"
+            fi
+        fi
+    fi
+
     log "INFO" "  • Startup flags: ${COMFY_FLAGS}"
 
     # Supervisor loop for safe restarts

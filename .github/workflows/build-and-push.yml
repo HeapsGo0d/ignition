@@ -12,7 +12,16 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+    strategy:
+      matrix:
+        include:
+          - dockerfile: Dockerfile
+            suffix: ""
+            description: "standard"
+          - dockerfile: Dockerfile.sa3
+            suffix: "-sa3"
+            description: "SageAttention3"
+
     steps:
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
@@ -49,19 +58,20 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=tag
-          type=raw,value=latest,enable={{is_default_branch}}
-          
-    - name: Build and push Docker image
+          type=ref,event=tag,suffix=${{ matrix.suffix }}
+          type=raw,value=latest${{ matrix.suffix }},enable={{is_default_branch}}
+
+    - name: Build and push Docker image (${{ matrix.description }})
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: ${{ matrix.dockerfile }}
         platforms: linux/amd64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=${{ matrix.dockerfile }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
         # Optimize for space and speed
         build-args: |
           BUILDKIT_INLINE_CACHE=1
