@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v3.5.1",
+  "name": "Ignition ComfyUI v3.5.4",
   "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.5.1",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.5.4",
   "ports": [
     {
       "privatePort": 8188,
@@ -82,6 +82,16 @@
       "key": "ENABLE_MANAGER_UI",
       "value": "false",
       "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
+    },
+    {
+      "key": "ENABLE_SAGEATTENTION",
+      "value": "false",
+      "description": "Enable SAGE Attention optimization (false = disabled, true = auto-install and enable)"
+    },
+    {
+      "key": "SAGEATTENTION_VERSION",
+      "value": "1.0.6",
+      "description": "SAGE Attention version to install (default: 1.0.6 with prebuilt wheels)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
