@@ -113,6 +113,38 @@ export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
 
 **Note:** Both scripts are idempotent and safe to rerun.
 
+### SAGE Attention (Inference Performance Optimization)
+```bash
+/workspace/scripts/optional/install-sageattention.sh
+```
+
+**What it does:**
+- Installs SAGE Attention library for faster inference (2-5x speedup on supported GPUs)
+- Optimizes attention mechanisms in diffusion models
+- Compatible with FLUX, SDXL, and other modern architectures
+
+**How to enable:**
+```bash
+# Install the library (run once)
+/workspace/scripts/optional/install-sageattention.sh
+
+# Enable at startup
+export ENABLE_SAGEATTENTION=1
+
+# Optional: Pin specific version (default is 1.0.6 with prebuilt wheels)
+export SAGEATTENTION_VERSION=1.0.6
+```
+
+**When to use:**
+- Running on RTX 30xx/40xx/50xx series GPUs
+- Want faster generation times
+- Using FLUX or SDXL models frequently
+
+**Important notes:**
+- Version 1.0.6 (default) has prebuilt wheels for fast installation
+- Version 2.2.0+ requires building from source (slower, may fail on some systems)
+- Not all models benefit equally - test with your specific workflows
+
 ## 📋 Environment Variables
 
 | Variable | Description | Default | Example |
@@ -129,6 +161,9 @@ export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
 | `COMFYUI_PORT` | ComfyUI web interface port | `"8188"` | `"8188"` |
 | `FILEBROWSER_PORT` | File browser port | `"8080"` | `"8080"` |
 | `PERSISTENT_STORAGE` | Persistent storage path | `"none"` | `"/workspace/models"` |
+| `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"0"` | `"1"` (after installing) |
+| `SAGEATTENTION_VERSION` | SAGE Attention version to install | `"1.0.6"` | `"2.2.0"` |
+| `COMFY_FLAGS` | ComfyUI startup flags | `"--preview-method auto"` | `"--lowvram"` |
 
 ## 🔍 Finding Model IDs
 
@@ -264,10 +299,13 @@ FILEBROWSER_PORT="3001"
 ### Performance Tuning
 ```bash
 # Low VRAM mode (for cards with limited memory)
-export COMFY_FLAGS="--lowvram --use-sage-attention"
+export COMFY_FLAGS="--lowvram"
 
-# Disable SAGE temporarily (troubleshooting)
-export COMFY_FLAGS="--preview-method auto"
+# Enable SAGE Attention (after installing via optional script)
+export ENABLE_SAGEATTENTION=1
+
+# Custom flags (combine as needed)
+export COMFY_FLAGS="--preview-method auto --lowvram"
 
 # Minimal flags (fastest startup)
 export COMFY_FLAGS=""
@@ -360,7 +398,7 @@ Ignition includes targeted optimizations for RTX 5090 and modern GPUs:
 
 **Inference Performance:**
 - PyTorch nightly with CUDA 12.8 support
-- SAGE Attention enabled by default (2-5x faster)
+- SAGE Attention available as optional addon (2-5x faster when enabled)
 - Customizable via `COMFY_FLAGS` environment variable
 
 **See "🎯 Optional Enhancements" above for additional performance plugins.**

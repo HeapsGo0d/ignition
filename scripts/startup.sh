@@ -302,7 +302,19 @@ start_comfyui() {
     rm -f /tmp/comfyui.stop
 
     # ---- ignition flags (env-tunable) ----
-    : "${COMFY_FLAGS:=--preview-method auto --use-sage-attention}"
+    : "${COMFY_FLAGS:=--preview-method auto}"
+
+    # Conditionally enable SAGE Attention if requested and available
+    if [ "${ENABLE_SAGEATTENTION:-0}" = "1" ]; then
+        if python3 -c "import sageattention" 2>/dev/null; then
+            COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
+            log "INFO" "  • SAGE Attention enabled"
+        else
+            log "WARN" "  • SAGE Attention requested but not installed"
+            log "WARN" "  • Run: /workspace/scripts/optional/install-sageattention.sh"
+        fi
+    fi
+
     log "INFO" "  • Startup flags: ${COMFY_FLAGS}"
 
     # Supervisor loop for safe restarts
