@@ -125,15 +125,20 @@ export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
 
 **How to enable:**
 ```bash
-# Install the library (run once)
-/workspace/scripts/optional/install-sageattention.sh
-
-# Enable at startup
-export ENABLE_SAGEATTENTION=1
+# Automatic installation - just set the environment variable in your RunPod template:
+ENABLE_SAGEATTENTION=1
 
 # Optional: Pin specific version (default is 1.0.6 with prebuilt wheels)
-export SAGEATTENTION_VERSION=1.0.6
+SAGEATTENTION_VERSION=1.0.6
+
+# Manual installation (if needed):
+/workspace/scripts/optional/install-sageattention.sh
 ```
+
+**How it works:**
+- When `ENABLE_SAGEATTENTION=1` is set, SageAttention installs automatically on first startup
+- Subsequent startups detect it's already installed and enable it immediately
+- No SSH access or manual intervention required
 
 **When to use:**
 - Running on RTX 30xx/40xx/50xx series GPUs

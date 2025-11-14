@@ -310,8 +310,13 @@ start_comfyui() {
             COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
             log "INFO" "  • SAGE Attention enabled"
         else
-            log "WARN" "  • SAGE Attention requested but not installed"
-            log "WARN" "  • Run: /workspace/scripts/optional/install-sageattention.sh"
+            log "INFO" "  • SAGE Attention requested, installing automatically..."
+            if /workspace/scripts/optional/install-sageattention.sh; then
+                COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
+                log "INFO" "  • SAGE Attention installed and enabled"
+            else
+                log "WARN" "  • SAGE Attention installation failed, continuing without it"
+            fi
         fi
     fi
 
