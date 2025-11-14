@@ -108,21 +108,44 @@ check_api_requirements() {
 get_configuration() {
     echo -e "${YELLOW}🔧 Configuration Setup${NC}"
     echo ""
-    
+
+    # Variant selection
+    echo -e "${BLUE}Image Variant:${NC}"
+    echo "  1) Standard (Python 3.11, SageAttention2 optional)"
+    echo "  2) SageAttention3 (Python 3.13, for Blackwell GPUs - RTX 5090)"
+    read -p "Select variant [1]: " variant_input
+    VARIANT=${variant_input:-1}
+
     # Version input (easy mode)
     echo -e "${BLUE}Version:${NC}"
-    read -p "Enter version tag (e.g., v1.0.12) [latest]: " version_input
+    read -p "Enter version tag (e.g., v3.6.0) [latest]: " version_input
     VERSION_TAG=${version_input:-latest}
-    
-    # Auto-generate image and template names based on version
-    if [[ "$VERSION_TAG" == "latest" ]]; then
-        DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"
-        TEMPLATE_NAME="Ignition ComfyUI Latest"
+
+    # Auto-generate image and template names based on version and variant
+    if [[ "$VARIANT" == "2" ]]; then
+        # SageAttention3 variant
+        if [[ "$VERSION_TAG" == "latest" ]]; then
+            DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest-sa3"
+            TEMPLATE_NAME="Ignition ComfyUI Latest (SageAttention3)"
+            TEMPLATE_DESCRIPTION="ComfyUI with SageAttention3 for Blackwell GPUs (RTX 5090) - Python 3.13 variant with lossless 2-5x speedup"
+        else
+            DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG-sa3"
+            TEMPLATE_NAME="Ignition ComfyUI $VERSION_TAG (SageAttention3)"
+            TEMPLATE_DESCRIPTION="ComfyUI with SageAttention3 for Blackwell GPUs (RTX 5090) - Python 3.13 variant with lossless 2-5x speedup"
+        fi
     else
-        DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG"
-        TEMPLATE_NAME="Ignition ComfyUI $VERSION_TAG"
+        # Standard variant
+        if [[ "$VERSION_TAG" == "latest" ]]; then
+            DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"
+            TEMPLATE_NAME="Ignition ComfyUI Latest"
+            TEMPLATE_DESCRIPTION="Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional"
+        else
+            DOCKER_IMAGE="heapsgo0d/ignition-comfyui:$VERSION_TAG"
+            TEMPLATE_NAME="Ignition ComfyUI $VERSION_TAG"
+            TEMPLATE_DESCRIPTION="Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional"
+        fi
     fi
-    
+
     echo "  → Docker Image: $DOCKER_IMAGE"
     echo "  → Template Name: $TEMPLATE_NAME"
     echo ""
@@ -266,7 +289,23 @@ generate_template() {
       "key": "ENABLE_MANAGER_UI",
       "value": "false",
       "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
+    }$(if [[ "$VARIANT" == "2" ]]; then
+    cat << 'VARIANT_ENV'
+,
+    {
+      "key": "ENABLE_SAGEATTENTION3",
+      "value": "true",
+      "description": "Enable SAGE Attention 3 for Blackwell GPUs (true = enabled by default in this image)"
     },
+    {
+      "key": "SAGEATTENTION3_WHEEL_URL",
+      "value": "https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl",
+      "description": "SageAttention3 wheel URL (pre-configured for this release)"
+    }
+VARIANT_ENV
+else
+    cat << 'VARIANT_ENV'
+,
     {
       "key": "ENABLE_SAGEATTENTION",
       "value": "false",
@@ -277,6 +316,8 @@ generate_template() {
       "value": "1.0.6",
       "description": "SAGE Attention version to install (default: 1.0.6 with prebuilt wheels)"
     }
+VARIANT_ENV
+fi)
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
 }
@@ -469,9 +510,15 @@ deploy_template() {
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
     {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
-    {"key": "ENABLE_MANAGER_UI", "value": "false"},
+    {"key": "ENABLE_MANAGER_UI", "value": "false"}$(if [[ "$VARIANT" == "2" ]]; then
+    echo ',
+    {"key": "ENABLE_SAGEATTENTION3", "value": "true"},
+    {"key": "SAGEATTENTION3_WHEEL_URL", "value": "https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl"}'
+else
+    echo ',
     {"key": "ENABLE_SAGEATTENTION", "value": "false"},
-    {"key": "SAGEATTENTION_VERSION", "value": "1.0.6"}
+    {"key": "SAGEATTENTION_VERSION", "value": "1.0.6"}'
+fi)
   ]
 }
 EOF

@@ -1,7 +1,7 @@
 # Ignition - ComfyUI with SageAttention3 for Blackwell
 # Python 3.13 variant for RTX 5090 and Blackwell GPUs
 
-FROM nvidia/cuda:12.8.0-cudnn9-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04 AS base
 
 # Install Python 3.13 from deadsnakes PPA
 RUN apt-get update && \
