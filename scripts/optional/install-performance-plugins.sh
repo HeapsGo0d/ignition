@@ -32,11 +32,11 @@ if [ ! -d "ComfyUI-Crystools" ]; then
 fi
 install_reqs_if_any "ComfyUI-Crystools"
 
-if [ ! -d "ComfyUI-Various" ]; then
-  git clone --depth 1 https://github.com/Various-UI-Extensions/ComfyUI-Various.git
-  echo "✅ Cloned ComfyUI-Various"
+if [ ! -d "comfyui-various" ]; then
+  git clone --depth 1 https://github.com/jamesWalker55/comfyui-various.git
+  echo "✅ Cloned comfyui-various"
 fi
-install_reqs_if_any "ComfyUI-Various"
+install_reqs_if_any "comfyui-various"
 
 # Optional plugins (env-gated)
 if [ "${ENABLE_IMPACT_PACK:-0}" = "1" ]; then
@@ -62,7 +62,7 @@ echo "📌 Pinning plugin versions..."
 lock_plugins () {
   (
     cd "$CNODES"
-    for d in ComfyUI-Custom-Scripts ComfyUI-Crystools ComfyUI-Various ComfyUI-Impact-Pack comfyui_controlnet_aux; do
+    for d in ComfyUI-Custom-Scripts ComfyUI-Crystools comfyui-various ComfyUI-Impact-Pack comfyui_controlnet_aux; do
       [ -d "$d" ] && echo "$d $(git -C "$d" rev-parse --short HEAD)"
     done
   ) | tee "$COMFY/plugins.lock"
