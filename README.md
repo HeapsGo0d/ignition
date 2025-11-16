@@ -150,6 +150,33 @@ SAGEATTENTION_VERSION=1.0.6
 - Version 2.2.0+ requires building from source (slower, may fail on some systems)
 - Not all models benefit equally - test with your specific workflows
 
+### Qwen-VL (Vision-Language Models)
+```bash
+/workspace/scripts/optional/install-qwen-vl.sh
+```
+
+**What it does:**
+- Installs Qwen-VL custom node for image understanding and visual question answering
+- Enables multimodal AI capabilities (image captioning, visual reasoning, multi-image analysis)
+- Models auto-download from HuggingFace on first use
+
+**Recommended models for RTX 5090:**
+- **Qwen2-VL-7B-Instruct** (~15GB download, ~16GB VRAM) - Best quality/performance balance
+- **Qwen2-VL-2B-Instruct** (~4GB download, ~8GB VRAM) - Faster, still very capable
+
+**Use cases:**
+- Image captioning and description
+- Visual question answering
+- Multi-image comparison and reasoning
+- Understanding image content for prompt generation
+
+**When to use:**
+- Experimenting with vision-language models
+- Need automated image understanding in your workflows
+- Want to combine image generation with image comprehension
+
+**Note:** This is an experimental feature for testing Qwen-VL capabilities. Models download on first use, so initial run may take time depending on your network.
+
 ## 📋 Environment Variables
 
 | Variable | Description | Default | Example |
