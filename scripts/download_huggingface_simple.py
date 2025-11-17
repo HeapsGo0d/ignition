@@ -70,6 +70,12 @@ FLUX_MODELS = {
         'url': 'https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V1.1.safetensors',
         'filename': 'Qwen-Image-Lightning-8steps-V1.1.safetensors',
         'subdir': 'loras'
+    },
+    # Qwen-Image-Edit models (image editing variant)
+    'qwen_image_edit_fp8': {
+        'url': 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_fp8_e4m3fn.safetensors',
+        'filename': 'qwen_image_edit_fp8_e4m3fn.safetensors',
+        'subdir': 'diffusion_models'
     }
 }
 

@@ -192,27 +192,35 @@ When using `template.sh`, you can select from smart presets for image generation
 - VRAM: ~16GB
 - Best for: Versatile image generation, well-tested workflows
 
-**Preset 2: Qwen-Image**
+**Preset 2: Qwen-Image (Generation)**
 - Models: `qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step`
 - VRAM: ~20GB (RTX 5090 compatible)
-- Best for: Text rendering (English/Chinese), photorealistic images, fast generation with Lightning LoRA
+- Best for: Text-to-image generation, text rendering (English/Chinese), fast generation with Lightning LoRA
 
-**Preset 3: Both FLUX + Qwen-Image**
-- Includes both model sets (without Lightning LoRA to save space)
-- VRAM: Models loaded one at a time
-- Best for: Experimenting with both models
+**Preset 3: Qwen-Image-Edit (Editing)**
+- Models: `qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae`
+- VRAM: ~20GB (RTX 5090 compatible)
+- Best for: Image editing, inpainting, object removal, style transfer, background changes
 
-**Preset 4: Custom**
+**Preset 4: Qwen-Image + Edit (Both)**
+- Models: Both generation and editing diffusion models + shared text encoder/VAE + Lightning LoRA
+- VRAM: ~20GB per model (load one at a time)
+- Best for: Users who want both generation and editing capabilities
+
+**Preset 5: Custom**
 - Manually specify model names
 - Advanced users only
 
-**Manual Qwen-Image Setup:**
+**Manual Qwen Setup:**
 ```bash
-# Core Qwen-Image models (required)
-HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae"
-
-# With Lightning LoRA for faster generation (optional, recommended)
+# Generation only (text-to-image)
 HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
+
+# Editing only (inpainting, object removal)
+HUGGINGFACE_MODELS="qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae"
+
+# Both generation & editing
+HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
 ```
 
 **Generation Times (RTX 5090):**
@@ -221,10 +229,11 @@ HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning
 - With 4-step Lightning LoRA: ~55s (4-step available as `qwen_lightning_4step`)
 
 **Qwen-Image Features:**
-- Exceptional text rendering in both English and Chinese
-- Multiple art styles: photorealistic, anime, impressionist, minimalist
+- **Generation:** Exceptional text rendering in English/Chinese, multiple art styles (photorealistic, anime, etc.)
+- **Editing:** Inpainting, object removal/insertion, style transfer, background changes
 - Native ComfyUI support (no custom nodes required)
-- 20B parameter MMDiT model
+- 20B parameter MMDiT models (separate for generation vs editing)
+- Optimized FP8 variants for RTX 5090 (16 connections, 10MB corruption detection)
 
 ## 📁 File Organization
 

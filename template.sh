@@ -154,9 +154,10 @@ get_configuration() {
     # Image Generation Model Preset Selection
     echo -e "${BLUE}Image Generation Model:${NC}"
     echo "  1) FLUX (default - versatile, well-tested)"
-    echo "  2) Qwen-Image (new - excellent text rendering, Chinese support)"
-    echo "  3) Both FLUX + Qwen-Image"
-    echo "  4) Custom (manual entry)"
+    echo "  2) Qwen-Image (generation - excellent text rendering)"
+    echo "  3) Qwen-Image-Edit (editing - inpainting, object removal)"
+    echo "  4) Qwen-Image + Edit (both generation & editing)"
+    echo "  5) Custom (manual entry)"
     read -p "Select preset [1]: " model_preset
 
     case ${model_preset:-1} in
@@ -166,13 +167,17 @@ get_configuration() {
             ;;
         2)
             HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
-            echo "  → Selected: Qwen-Image"
+            echo "  → Selected: Qwen-Image (generation)"
             ;;
         3)
-            HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae,qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae"
-            echo "  → Selected: Both FLUX + Qwen-Image"
+            HUGGINGFACE_MODELS="qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae"
+            echo "  → Selected: Qwen-Image-Edit (editing)"
             ;;
         4)
+            HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
+            echo "  → Selected: Qwen-Image + Edit (both)"
+            ;;
+        5)
             read -p "Enter model names (comma-separated): " input_hf
             HUGGINGFACE_MODELS=${input_hf}
             echo "  → Selected: Custom"
