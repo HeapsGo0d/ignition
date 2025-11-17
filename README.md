@@ -183,6 +183,49 @@ SAGEATTENTION_VERSION=1.0.6
 2. The repository ID is in the URL: `huggingface.co/black-forest-labs/FLUX.1-dev`
 3. Use the full repository path: `black-forest-labs/FLUX.1-dev`
 
+### Qwen-Image Model Presets
+
+When using `template.sh`, you can select from smart presets for image generation models:
+
+**Preset 1: FLUX (Default)**
+- Models: `flux1-dev,clip_l,t5xxl_fp16,ae`
+- VRAM: ~16GB
+- Best for: Versatile image generation, well-tested workflows
+
+**Preset 2: Qwen-Image**
+- Models: `qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step`
+- VRAM: ~20GB (RTX 5090 compatible)
+- Best for: Text rendering (English/Chinese), photorealistic images, fast generation with Lightning LoRA
+
+**Preset 3: Both FLUX + Qwen-Image**
+- Includes both model sets (without Lightning LoRA to save space)
+- VRAM: Models loaded one at a time
+- Best for: Experimenting with both models
+
+**Preset 4: Custom**
+- Manually specify model names
+- Advanced users only
+
+**Manual Qwen-Image Setup:**
+```bash
+# Core Qwen-Image models (required)
+HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae"
+
+# With Lightning LoRA for faster generation (optional, recommended)
+HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
+```
+
+**Generation Times (RTX 5090):**
+- Without LoRA: ~94s first run, ~71s subsequent
+- With 8-step Lightning LoRA: ~34s
+- With 4-step Lightning LoRA: ~55s (4-step available as `qwen_lightning_4step`)
+
+**Qwen-Image Features:**
+- Exceptional text rendering in both English and Chinese
+- Multiple art styles: photorealistic, anime, impressionist, minimalist
+- Native ComfyUI support (no custom nodes required)
+- 20B parameter MMDiT model
+
 ## 📁 File Organization
 
 Models are automatically organized into the correct ComfyUI directories:
