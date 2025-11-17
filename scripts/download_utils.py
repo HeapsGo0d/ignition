@@ -126,8 +126,12 @@ def validate_huggingface_repo(repo: str) -> bool:
 
     repo = repo.strip()
 
-    # Check for predefined models (single words)
-    predefined_models = ['flux1-dev', 'clip_l', 't5xxl_fp16', 't5xxl_fp8', 'ae', 'flux1-krea-dev']
+    # Check for predefined models (single words or underscored keys)
+    predefined_models = [
+        'flux1-dev', 'clip_l', 't5xxl_fp16', 't5xxl_fp8', 'ae', 'flux1-krea-dev',
+        'qwen_image_fp8', 'qwen_text_encoder_fp8', 'qwen_vae',
+        'qwen_lightning_4step', 'qwen_lightning_8step'
+    ]
     if repo in predefined_models:
         return True
 
