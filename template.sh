@@ -153,38 +153,43 @@ get_configuration() {
     
     # Image Generation Model Preset Selection
     echo -e "${BLUE}Image Generation Model:${NC}"
-    echo "  1) FLUX (default - versatile, well-tested)"
-    echo "  2) Qwen-Image (generation - excellent text rendering)"
-    echo "  3) Qwen-Image-Edit (editing - inpainting, object removal)"
-    echo "  4) Qwen-Image + Edit (both generation & editing)"
-    echo "  5) Custom (manual entry)"
+    echo "  1) FLUX.1-dev (default - best quality, ~70s/gen)"
+    echo "  2) FLUX.1-schnell (fast - 4 steps, ~7s/gen)"
+    echo "  3) Qwen-Image (generation - excellent text rendering)"
+    echo "  4) Qwen-Image-Edit (editing - inpainting, object removal)"
+    echo "  5) Qwen-Image + Edit (both generation & editing)"
+    echo "  6) Custom (manual entry)"
     read -p "Select preset [1]: " model_preset
 
     case ${model_preset:-1} in
         1)
             HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae"
-            echo "  → Selected: FLUX"
+            echo "  → Selected: FLUX.1-dev"
             ;;
         2)
+            HUGGINGFACE_MODELS="flux1-schnell,clip_l,t5xxl_fp16,ae"
+            echo "  → Selected: FLUX.1-schnell (fast)"
+            ;;
+        3)
             HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
             echo "  → Selected: Qwen-Image (generation)"
             ;;
-        3)
+        4)
             HUGGINGFACE_MODELS="qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae"
             echo "  → Selected: Qwen-Image-Edit (editing)"
             ;;
-        4)
+        5)
             HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
             echo "  → Selected: Qwen-Image + Edit (both)"
             ;;
-        5)
+        6)
             read -p "Enter model names (comma-separated): " input_hf
             HUGGINGFACE_MODELS=${input_hf}
             echo "  → Selected: Custom"
             ;;
         *)
             HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae"
-            echo "  → Invalid selection, defaulting to FLUX"
+            echo "  → Invalid selection, defaulting to FLUX.1-dev"
             ;;
     esac
     echo ""
@@ -208,6 +213,14 @@ get_configuration() {
     CONTAINER_DISK_GB=${tmp_disk:-$CONTAINER_DISK_GB}
     read -p "Default volume size in GB (0 = ephemeral) [${VOLUME_GB}]: " tmp_vol
     VOLUME_GB=${tmp_vol:-$VOLUME_GB}
+    echo ""
+
+    # Persistent storage setting
+    echo -e "${BLUE}Persistent Storage:${NC}"
+    echo "  • 'none' = Ephemeral (no persistent storage)"
+    echo "  • Path = Persistent (e.g., /workspace/models)"
+    read -p "Storage mode [none]: " input_storage
+    PERSISTENT_STORAGE=${input_storage:-none}
     echo ""
 }
 

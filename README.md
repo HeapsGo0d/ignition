@@ -183,31 +183,39 @@ SAGEATTENTION_VERSION=1.0.6
 2. The repository ID is in the URL: `huggingface.co/black-forest-labs/FLUX.1-dev`
 3. Use the full repository path: `black-forest-labs/FLUX.1-dev`
 
-### Qwen-Image Model Presets
+### Image Generation Model Presets
 
 When using `template.sh`, you can select from smart presets for image generation models:
 
-**Preset 1: FLUX (Default)**
+**Preset 1: FLUX.1-dev (Default)**
 - Models: `flux1-dev,clip_l,t5xxl_fp16,ae`
 - VRAM: ~16GB
-- Best for: Versatile image generation, well-tested workflows
+- Generation time: ~70s/image on RTX 5090
+- Best for: Highest quality image generation, well-tested workflows, detailed outputs
 
-**Preset 2: Qwen-Image (Generation)**
+**Preset 2: FLUX.1-schnell (Fast)**
+- Models: `flux1-schnell,clip_l,t5xxl_fp16,ae`
+- VRAM: ~16GB
+- Generation time: ~7s/image on RTX 5090 (4 steps vs 50 steps)
+- Best for: Rapid iteration, previews, real-time workflows, batch generation
+- Note: Slightly lower quality than dev but 10x faster
+
+**Preset 3: Qwen-Image (Generation)**
 - Models: `qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step`
 - VRAM: ~20GB (RTX 5090 compatible)
 - Best for: Text-to-image generation, text rendering (English/Chinese), fast generation with Lightning LoRA
 
-**Preset 3: Qwen-Image-Edit (Editing)**
+**Preset 4: Qwen-Image-Edit (Editing)**
 - Models: `qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae`
 - VRAM: ~20GB (RTX 5090 compatible)
 - Best for: Image editing, inpainting, object removal, style transfer, background changes
 
-**Preset 4: Qwen-Image + Edit (Both)**
+**Preset 5: Qwen-Image + Edit (Both)**
 - Models: Both generation and editing diffusion models + shared text encoder/VAE + Lightning LoRA
 - VRAM: ~20GB per model (load one at a time)
 - Best for: Users who want both generation and editing capabilities
 
-**Preset 5: Custom**
+**Preset 6: Custom**
 - Manually specify model names
 - Advanced users only
 

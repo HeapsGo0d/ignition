@@ -45,6 +45,11 @@ FLUX_MODELS = {
         'filename': 'flux1-krea-dev.safetensors',
         'subdir': 'diffusion_models'
     },
+    'flux1-schnell': {
+        'url': 'https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell.safetensors',
+        'filename': 'flux1-schnell.safetensors',
+        'subdir': 'diffusion_models'
+    },
     # Qwen-Image models (20B parameter diffusion model)
     'qwen_image_fp8': {
         'url': 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors',
