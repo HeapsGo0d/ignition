@@ -45,3 +45,6 @@ template_inputs.txt
 *.bak
 *.backup
 *~.bak
+.gemini/
+gha-creds-*.json
+.github/workflows/gemini-*.yml
