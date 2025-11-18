@@ -130,7 +130,7 @@ def validate_huggingface_repo(repo: str) -> bool:
     predefined_models = [
         'flux1-dev', 'clip_l', 't5xxl_fp16', 't5xxl_fp8', 'ae', 'flux1-krea-dev', 'flux1-schnell',
         'qwen_image_fp8', 'qwen_text_encoder_fp8', 'qwen_vae',
-        'qwen_lightning_4step', 'qwen_lightning_8step', 'qwen_image_edit_fp8'
+        'qwen_lightning_4step', 'qwen_lightning_8step', 'qwen_image_edit_2509_fp8'
     ]
     if repo in predefined_models:
         return True

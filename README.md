@@ -206,9 +206,10 @@ When using `template.sh`, you can select from smart presets for image generation
 - Best for: Text-to-image generation, text rendering (English/Chinese), fast generation with Lightning LoRA
 
 **Preset 4: Qwen-Image-Edit (Editing)**
-- Models: `qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae`
+- Models: `qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae`
 - VRAM: ~20GB (RTX 5090 compatible)
 - Best for: Image editing, inpainting, object removal, style transfer, background changes
+- Note: Uses latest Sept 2025 version with improved person/product editing
 
 **Preset 5: Qwen-Image + Edit (Both)**
 - Models: Both generation and editing diffusion models + shared text encoder/VAE + Lightning LoRA
@@ -225,10 +226,10 @@ When using `template.sh`, you can select from smart presets for image generation
 HUGGINGFACE_MODELS="qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
 
 # Editing only (inpainting, object removal)
-HUGGINGFACE_MODELS="qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae"
+HUGGINGFACE_MODELS="qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae"
 
 # Both generation & editing
-HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
+HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
 ```
 
 **Generation Times (RTX 5090):**

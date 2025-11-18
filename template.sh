@@ -175,11 +175,11 @@ get_configuration() {
             echo "  → Selected: Qwen-Image (generation)"
             ;;
         4)
-            HUGGINGFACE_MODELS="qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae"
+            HUGGINGFACE_MODELS="qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae"
             echo "  → Selected: Qwen-Image-Edit (editing)"
             ;;
         5)
-            HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
+            HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
             echo "  → Selected: Qwen-Image + Edit (both)"
             ;;
         6)
