@@ -1,8 +1,8 @@
 # Ignition - ComfyUI with Dynamic Model Loading
 # Optimized for RTX 5090 and RunPod deployment
-# Using NVIDIA's official PyTorch container with RTX 5090 support
+# Using PyTorch 2.7.0 with CUDA 12.8 for RTX 5090 Blackwell support
 
-FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel AS base
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -30,18 +30,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Use PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
-# Based on Hearmeman's proven approach: https://github.com/Hearmeman24/comfyui-sdxl
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --pre --upgrade --upgrade-strategy eager \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+# PyTorch 2.7.0 stable with CUDA 12.8 is included in base image
+# No need for nightly builds - stable release now supports RTX 5090 Blackwell
+# Previous approach used nightly: https://github.com/Hearmeman24/comfyui-sdxl
+# Upgraded to stable for better reliability and reproducibility
 
-# Runtime libraries (triton comes with PyTorch nightly)
+# Runtime libraries (triton comes with PyTorch)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install pyyaml gdown
 
 # Install ComfyUI directly (more reliable than comfy-cli)
-# Filter out torch packages to prevent downgrade from nightly (but keep torchsde)
+# Filter out torch packages to use base image version (but keep torchsde)
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI && \
     cd /workspace/ComfyUI && \
     grep -v "^torch$" requirements.txt | \
