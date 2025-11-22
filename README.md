@@ -2,24 +2,34 @@
 
 **Simplicity · Elegance · Functional**
 
-Ignition is a RunPod-optimized Docker container that automatically downloads and configures models for ComfyUI at runtime. Built for RTX 5090 performance with robust, atomic file operations and supervisor-based restart architecture.
+Ignition is a RunPod-optimized Docker container that automatically downloads and configures models for ComfyUI at runtime. Built for RTX 5090 performance with PyTorch nightly, robust atomic file operations, and supervisor-based restart architecture.
 
 ## ✨ Features
 
+### Core Capabilities
 - **🎨 Dynamic Model Loading**: Specify models via environment variables, download on startup
-- **🔄 Safe Restart Architecture**: Supervisor loop enables in-place restarts without data loss
-- **🎛️ Runtime Manager UI Toggle**: Enable/disable ComfyUI-Manager UI without rebuilding
 - **⚡ Parallel Downloads**: Efficient concurrent downloading from CivitAI and HuggingFace
 - **🔒 Atomic File Operations**: Robust download → verify → move → cleanup prevents corruption
-- **💾 Persistent Storage**: Optional persistent model storage to survive container restarts
-- **🔐 File Browser**: Integrated file manager with configurable authentication
+- **🔄 Safe Restart Architecture**: Supervisor loop enables in-place restarts without data loss
+- **💾 Flexible Storage**: Ephemeral (fast) or persistent (cached) model storage
+
+### Built-in Optimizations (v3.7.0+)
+- **🎛️ Manager UI Enabled by Default**: Full ComfyUI-Manager access with offline mode (no 5-min delay)
+- **📦 Performance Plugins Pre-installed**: ComfyUI-Custom-Scripts, Crystools, Various included
+- **⚡ SAGE Attention Ready**: Optional runtime or build-time SageAttention support
+- **🚀 PyTorch Nightly + CUDA 12.8**: Optimized for RTX 5090 Blackwell architecture
+
+### Developer-Friendly
+- **📁 Interactive Template Creator**: `template.sh` with smart model presets (FLUX, Qwen, custom)
+- **🔐 Integrated File Browser**: Web-based file management on port 8080
 - **📊 Progress Monitoring**: Real-time download progress and system status logging
+- **🔒 Privacy Lite**: Automatic telemetry blocking and connection monitoring
 
 ## 🚀 Quick Start
 
 ### Automated Template Creation
 
-Use the included script to create a pre-configured RunPod template:
+Use the included script to create a pre-configured RunPod template with interactive prompts:
 
 #### **Option 1: Local File Generation (Default)**
 ```bash
@@ -32,32 +42,28 @@ export RUNPOD_API_KEY="your_runpod_api_key_here"
 ./template.sh --deploy
 ```
 
-**Both modes generate a complete RunPod template with:**
-- Pre-configured environment variables for your models
-- Deployment documentation and usage instructions
-- API deployment creates the template directly in your RunPod account (no manual upload)
+**Interactive Prompts Guide:**
 
-### Manual Configuration
+1. **Version Selection**: Enter tag (e.g., `v3.7.0`) or `latest`
+2. **Model Preset**: Choose from 6 smart presets:
+   - FLUX.1-dev (best quality, ~70s/gen)
+   - FLUX.1-schnell (fast, ~7s/gen)
+   - Qwen-Image (generation, excellent text rendering)
+   - Qwen-Image-Edit (editing, inpainting)
+   - Qwen-Image + Edit (both capabilities)
+   - Custom (manual entry)
+3. **SageAttention**: Select performance optimization level:
+   - Disabled (default, no performance boost)
+   - v1.0.6 stable (~15-20% speedup, runtime install)
+   - SA3 experimental (~25-30% speedup, requires custom build)
+4. **Security & Storage**: Configure passwords and storage preferences
 
-Alternatively, set these environment variables in your RunPod template:
+**Both modes generate:**
+- Pre-configured RunPod template with your settings
+- Deployment documentation (RUNPOD_USAGE.md)
+- API mode creates template directly in your RunPod account
 
-```bash
-# Model Sources (comma-separated IDs)
-CIVITAI_MODELS="123456,789012,345678"  # CivitAI version IDs
-HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev"  # HF repository paths
-
-# Optional: API Tokens
-CIVITAI_TOKEN="your_civitai_api_token"
-HF_TOKEN="your_huggingface_token"
-
-# Optional: Configuration
-ENABLE_MANAGER_UI="false"  # true = +2-3s load time for Manager UI
-FILEBROWSER_PASSWORD="your_secure_password"
-COMFYUI_PORT="8188"
-FILEBROWSER_PORT="8080"
-```
-
-### Docker Run Example
+### Manual Docker Run Example
 
 ```bash
 docker run -d \
@@ -65,109 +71,39 @@ docker run -d \
   -p 8188:8188 \
   -p 8080:8080 \
   -e CIVITAI_MODELS="123456,789012" \
-  -e HUGGINGFACE_MODELS="black-forest-labs/FLUX.1-dev" \
+  -e HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae" \
   -e CIVITAI_TOKEN="your_token" \
-  heapsgo0d/ignition-comfyui:v3.4.1-supervisor
+  -e ENABLE_SAGEATTENTION="true" \
+  heapsgo0d/ignition-comfyui:v3.7.0
 ```
-
-## 🎯 Optional Enhancements
-
-After your pod starts, you can run these optional scripts via SSH for additional features:
-
-### SDXL VAE (Recommended for SDXL workflows)
-```bash
-/workspace/scripts/optional/download-sdxl-vae.sh
-```
-
-**What it does:**
-- Downloads official Stability AI SDXL VAE (335MB)
-- Improves image quality for SDXL-based models
-- Idempotent - safe to run multiple times
-
-**When to use:**
-- Working with SDXL checkpoints
-- Notice color banding or quality issues
-- Want optimal SDXL performance
-
-### Performance Plugins (UI/Workflow Enhancements)
-```bash
-/workspace/scripts/optional/install-performance-plugins.sh
-```
-
-**What it installs:**
-- **ComfyUI-eSuite**: UI quality-of-life improvements
-- **ComfyUI-Crystools**: Utility tools and workflow helpers
-- **ComfyUI-Various**: Additional UI extensions
-
-**Optional plugins (env-gated):**
-```bash
-# Enable before running script
-export ENABLE_IMPACT_PACK=1      # Advanced segmentation tools
-export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
-```
-
-**When to use:**
-- Want better UI/UX than stock ComfyUI
-- Need workflow management features
-- Using advanced techniques (ControlNet, segmentation)
-
-**Note:** Both scripts are idempotent and safe to rerun.
-
-### SAGE Attention (Inference Performance Optimization)
-```bash
-/workspace/scripts/optional/install-sageattention.sh
-```
-
-**What it does:**
-- Installs SAGE Attention library for faster inference (2-5x speedup on supported GPUs)
-- Optimizes attention mechanisms in diffusion models
-- Compatible with FLUX, SDXL, and other modern architectures
-
-**How to enable:**
-```bash
-# Automatic installation - just set the environment variable in your RunPod template:
-ENABLE_SAGEATTENTION=true
-
-# Optional: Pin specific version (default is 1.0.6 with prebuilt wheels)
-SAGEATTENTION_VERSION=1.0.6
-
-# Manual installation (if needed):
-/workspace/scripts/optional/install-sageattention.sh
-```
-
-**How it works:**
-- When `ENABLE_SAGEATTENTION=true` is set, SageAttention installs automatically on first startup
-- Subsequent startups detect it's already installed and enable it immediately
-- No SSH access or manual intervention required
-
-**When to use:**
-- Running on RTX 30xx/40xx/50xx series GPUs
-- Want faster generation times
-- Using FLUX or SDXL models frequently
-
-**Important notes:**
-- Version 1.0.6 (default) has prebuilt wheels for fast installation
-- Version 2.2.0+ requires building from source (slower, may fail on some systems)
-- Not all models benefit equally - test with your specific workflows
 
 ## 📋 Environment Variables
 
+### Model Sources
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `CIVITAI_MODELS` | Comma-separated CivitAI version IDs | `""` | `"123456,789012"` |
 | `CIVITAI_LORAS` | CivitAI LoRA version IDs | `""` | `"345678,901234"` |
 | `CIVITAI_VAES` | CivitAI VAE version IDs | `""` | `"567890"` |
 | `CIVITAI_FLUX` | CivitAI FLUX model IDs | `""` | `"234567"` |
-| `HUGGINGFACE_MODELS` | Comma-separated HF repository IDs | `""` | `"black-forest-labs/FLUX.1-dev"` |
-| `CIVITAI_TOKEN` | CivitAI API token | `""` | `"your_api_token"` |
-| `HF_TOKEN` | HuggingFace API token | `""` | `"hf_your_token"` |
-| `ENABLE_MANAGER_UI` | Enable ComfyUI-Manager UI | `"false"` | `"true"` or `"false"` |
+| `HUGGINGFACE_MODELS` | Comma-separated HF repository IDs | `""` | `"flux1-dev,clip_l,ae"` |
+
+### Authentication
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `CIVITAI_TOKEN` | CivitAI API token (for faster downloads/private models) | `""` | `"your_api_token"` |
+| `HF_TOKEN` | HuggingFace API token (for private repos) | `""` | `"hf_your_token"` |
+
+### Configuration
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `ENABLE_MANAGER_UI` | Enable ComfyUI-Manager UI | `"true"` | `"true"` or `"false"` |
+| `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"false"` | `"true"` or `"false"` |
+| `SAGEATTENTION_VERSION` | SAGE Attention version to install | `"1.0.6"` | `"1.0.6"`, `"3.0.0"` |
 | `FILEBROWSER_PASSWORD` | File browser password | `"runpod"` | `"secure_password"` |
 | `COMFYUI_PORT` | ComfyUI web interface port | `"8188"` | `"8188"` |
 | `FILEBROWSER_PORT` | File browser port | `"8080"` | `"8080"` |
 | `PERSISTENT_STORAGE` | Persistent storage path | `"none"` | `"/workspace/models"` |
-| `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"false"` | `"true"` or `"false"` |
-| `SAGEATTENTION_VERSION` | SAGE Attention version to install | `"1.0.6"` | `"2.2.0"` |
 | `COMFY_FLAGS` | ComfyUI startup flags | `"--preview-method auto"` | `"--lowvram"` |
 
 ## 🔍 Finding Model IDs
@@ -183,9 +119,11 @@ SAGEATTENTION_VERSION=1.0.6
 2. The repository ID is in the URL: `huggingface.co/black-forest-labs/FLUX.1-dev`
 3. Use the full repository path: `black-forest-labs/FLUX.1-dev`
 
-### Image Generation Model Presets
+## 🎨 Image Generation Model Presets
 
-When using `template.sh`, you can select from smart presets for image generation models:
+The `template.sh` script provides smart presets that automatically configure the correct model combinations:
+
+### FLUX Presets
 
 **Preset 1: FLUX.1-dev (Default)**
 - Models: `flux1-dev,clip_l,t5xxl_fp16,ae`
@@ -200,10 +138,14 @@ When using `template.sh`, you can select from smart presets for image generation
 - Best for: Rapid iteration, previews, real-time workflows, batch generation
 - Note: Slightly lower quality than dev but 10x faster
 
+### Qwen Presets
+
 **Preset 3: Qwen-Image (Generation)**
 - Models: `qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step`
 - VRAM: ~20GB (RTX 5090 compatible)
-- Best for: Text-to-image generation, text rendering (English/Chinese), fast generation with Lightning LoRA
+- Generation time: ~34s with 8-step Lightning LoRA, ~71s without
+- Best for: Text-to-image generation with exceptional text rendering (English/Chinese), fast generation
+- Features: Multiple art styles (photorealistic, anime, etc.), native ComfyUI support
 
 **Preset 4: Qwen-Image-Edit (Editing)**
 - Models: `qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae`
@@ -232,17 +174,119 @@ HUGGINGFACE_MODELS="qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae"
 HUGGINGFACE_MODELS="qwen_image_fp8,qwen_image_edit_2509_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step"
 ```
 
-**Generation Times (RTX 5090):**
-- Without LoRA: ~94s first run, ~71s subsequent
-- With 8-step Lightning LoRA: ~34s
-- With 4-step Lightning LoRA: ~55s (4-step available as `qwen_lightning_4step`)
-
-**Qwen-Image Features:**
-- **Generation:** Exceptional text rendering in English/Chinese, multiple art styles (photorealistic, anime, etc.)
-- **Editing:** Inpainting, object removal/insertion, style transfer, background changes
-- Native ComfyUI support (no custom nodes required)
+**Qwen-Image Technical Details:**
 - 20B parameter MMDiT models (separate for generation vs editing)
-- Optimized FP8 variants for RTX 5090 (16 connections, 10MB corruption detection)
+- Optimized FP8 variants for RTX 5090
+- Native ComfyUI support (no custom nodes required)
+- Generation times (RTX 5090): ~94s first run, ~71s subsequent, ~34s with 8-step Lightning
+
+## ⚡ SAGE Attention (Performance Optimization)
+
+SAGE Attention provides 15-30% faster inference on RTX 30xx/40xx/50xx series GPUs.
+
+### Option 1: Runtime Auto-Install (Recommended)
+
+Set environment variables - SageAttention installs automatically on first startup:
+
+```bash
+# Basic setup (uses v1.0.6 stable)
+ENABLE_SAGEATTENTION=true
+
+# Advanced: Pin specific version
+SAGEATTENTION_VERSION=1.0.6  # Stable, prebuilt wheels
+# or
+SAGEATTENTION_VERSION=3.0.0  # Experimental SA3 (requires custom build)
+```
+
+**How it works:**
+- When `ENABLE_SAGEATTENTION=true`, installation happens automatically on first startup
+- Subsequent startups detect it's installed and enable it immediately
+- No SSH access or manual intervention required
+
+### Option 2: Build-Time SA3 Wheel (Advanced)
+
+For maximum performance (~25-30% speedup), build with a custom-compiled SageAttention3 wheel:
+
+```bash
+# Build with SA3 wheel
+docker build \
+  --build-arg SAGEATTENTION_WHEEL_URL=https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl \
+  -t ignition-comfyui:sa3 .
+
+# Then deploy with ENABLE_SAGEATTENTION=true
+```
+
+**When to use SA3 wheel:**
+- Want maximum performance (~25-30% vs ~15-20% for v1.0.6)
+- Willing to manage custom builds
+- Have the precompiled wheel available
+
+**Using template.sh:**
+- Select "Option 3: Enabled with SA3" during SageAttention prompt
+- Script provides build command with correct wheel URL
+
+### Manual Installation (SSH)
+
+```bash
+# If needed - usually not required
+/workspace/scripts/optional/install-sageattention.sh
+```
+
+**Important Notes:**
+- Version 1.0.6 (default) has prebuilt wheels for fast installation
+- Version 3.0.0 (SA3) requires custom build or prebuilt wheel
+- Not all models benefit equally - test with your specific workflows
+- Best results with FLUX and SDXL models
+
+## 🎯 What's Included Out of the Box (v3.7.0+)
+
+Ignition now includes essential optimizations **pre-installed** - no manual setup required:
+
+### Manager UI (Enabled by Default)
+- **ComfyUI-Manager UI visible** in browser
+- **Network mode: offline** (no 5-min startup delay)
+- **Full custom node management** capabilities
+- To disable: Set `ENABLE_MANAGER_UI=false`
+
+### Performance Plugins (Auto-Installed)
+- **ComfyUI-Custom-Scripts**: UI quality-of-life improvements
+- **ComfyUI-Crystools**: Utility tools and workflow helpers
+- **comfyui-various**: Additional UI extensions
+- Plugin versions locked for reproducibility
+
+**Optional plugins** (env-gated, install via SSH if needed):
+```bash
+# Enable before running install script
+export ENABLE_IMPACT_PACK=1      # Advanced segmentation tools
+export ENABLE_CONTROLNET_AUX=1   # ControlNet preprocessors
+
+# Then run
+/workspace/scripts/optional/install-performance-plugins.sh
+```
+
+### File Browser
+- **Web-based file management** on port 8080
+- **Default login**: admin / (your configured password)
+- **Full filesystem access** to container
+
+## 🎯 Optional Enhancements
+
+Additional features available via SSH for specific use cases:
+
+### SDXL VAE (Recommended for SDXL workflows)
+```bash
+/workspace/scripts/optional/download-sdxl-vae.sh
+```
+
+**What it does:**
+- Downloads official Stability AI SDXL VAE (335MB)
+- Improves image quality for SDXL-based models
+- Idempotent - safe to run multiple times
+
+**When to use:**
+- Working with SDXL checkpoints
+- Notice color banding or quality issues
+- Want optimal SDXL performance
 
 ## 📁 File Organization
 
@@ -281,7 +325,7 @@ Ignition includes a supervisor loop architecture for safe restarts without data 
 - Apply custom node changes
 - Reload workflows
 - Recover from ComfyUI errors
-- Toggle Manager UI (see below)
+- Toggle Manager UI (change env var + soft restart)
 
 ### Hard Stop (Triggers Nuke)
 ```bash
@@ -307,41 +351,47 @@ Ignition includes a supervisor loop architecture for safe restarts without data 
 | **Hard Stop** | `stop-pod.sh` | Stops | ❌ Deleted | Exits | ✅ Yes |
 | **Crash** | *(automatic)* | Auto-restarts | ✅ Preserved | Running | ❌ No |
 
-## 🎛️ Manager UI Toggle
+## 🎛️ Manager UI & Performance
 
-ComfyUI-Manager UI can be enabled/disabled at runtime without rebuilding:
+### Default Configuration (v3.7.0+)
 
-### Default: Disabled (Instant Loads)
+ComfyUI-Manager UI is **enabled by default** for better usability:
+
+- **Manager UI visible** in ComfyUI browser interface
+- **Network mode: offline** (fast boot, no 5-min delay)
+- **Curated performance plugins** pre-installed
+- **Plugin versions locked** for reproducibility
+
+### Customization
+
+**To disable Manager UI:**
 ```bash
-ENABLE_MANAGER_UI="false"  # Default
-```
-- ComfyUI loads instantly (~1-2s)
-- Manager backend still installed
-- No browser UI for custom nodes
+# Set environment variable
+ENABLE_MANAGER_UI=false
 
-### Enable: Manager UI Available
-```bash
-ENABLE_MANAGER_UI="true"
+# Then run soft restart
+/workspace/scripts/restart-comfyui.sh
 ```
-- ComfyUI loads in ~3-5s (+2-3s overhead)
-- Full Manager UI in browser
-- Install/manage custom nodes visually
 
-**To toggle after deployment:**
-1. Update environment variable in RunPod
-2. Run soft restart: `/workspace/scripts/restart-comfyui.sh`
-3. Manager UI will be enabled/disabled on next load
+**Performance impact:**
+- UI enabled (default): ~3-5s load time
+- UI disabled: ~1-2s load time
+- Network mode offline: No 5-min startup delay (in both cases)
 
 ## 💾 Storage Options
 
 ### Ephemeral (Default)
-- `PERSISTENT_STORAGE="none"`
+```bash
+PERSISTENT_STORAGE="none"
+```
 - Models download fresh each container start
 - Fastest startup for one-time use
 - No storage requirements
 
 ### Persistent Storage
-- `PERSISTENT_STORAGE="/workspace/models"`
+```bash
+PERSISTENT_STORAGE="/workspace/models"
+```
 - Models persist between container restarts
 - Faster subsequent startups
 - Requires network volume or persistent disk
@@ -367,14 +417,12 @@ FILEBROWSER_PORT="3001"
 # Low VRAM mode (for cards with limited memory)
 export COMFY_FLAGS="--lowvram"
 
-# Enable SAGE Attention (after installing via optional script)
+# Enable SAGE Attention
 export ENABLE_SAGEATTENTION=true
+export SAGEATTENTION_VERSION=1.0.6
 
 # Custom flags (combine as needed)
 export COMFY_FLAGS="--preview-method auto --lowvram"
-
-# Minimal flags (fastest startup)
-export COMFY_FLAGS=""
 ```
 
 ### Manual Downloads
@@ -388,26 +436,10 @@ python3 /workspace/scripts/download_civitai_simple.py \
   --token "$CIVITAI_TOKEN" \
   --output-dir "/workspace/ComfyUI/models"
 
-# Download multiple FLUX models
-python3 /workspace/scripts/download_civitai_simple.py \
-  --flux "618692,741115" \
-  --token "$CIVITAI_TOKEN" \
-  --output-dir "/workspace/ComfyUI/models"
-
-# Mix different model types in one command
-python3 /workspace/scripts/download_civitai_simple.py \
-  --models "133005" \
-  --loras "135867" \
-  --flux "618692" \
-  --token "$CIVITAI_TOKEN" \
-  --output-dir "/workspace/ComfyUI/models"
-
 # Download from HuggingFace
 python3 /workspace/scripts/download_huggingface_simple.py \
-  black-forest-labs/FLUX.1-schnell
+  flux1-dev,clip_l,ae
 ```
-
-**Note:** The `--flux` flag ensures FLUX models go to `diffusion_models/` alongside your HuggingFace FLUX models.
 
 ## 🔒 Privacy & Cleanup
 
@@ -416,17 +448,15 @@ python3 /workspace/scripts/download_huggingface_simple.py \
 Ignition includes basic privacy protection for telemetry blocking and connection monitoring.
 
 **Features:**
-- **Telemetry Blocklist**: Blocks known analytics domains (CivitAI, Stability AI, Google Analytics, PostHog, etc.) via `/etc/hosts`
-- **Connection Monitoring**: Logs external connections every 2 minutes to `/tmp/ignition-connections.log`
-- **IPv4 + IPv6 Protection**: Blocks both protocols to prevent bypass
-- **Graceful Degradation**: Continues if `/etc/hosts` is read-only
+- **Telemetry Blocklist**: Blocks known analytics domains via `/etc/hosts`
+- **Connection Monitoring**: Logs external connections to `/tmp/ignition-connections.log`
+- **IPv4 + IPv6 Protection**: Blocks both protocols
+- **Automatic Setup**: Activates before model downloads
 
 **View Connection Log:**
 ```bash
 /workspace/scripts/privacy/show-connections.sh
 ```
-
-**Automatic Setup:** Privacy protection activates automatically on container start before any model downloads occur.
 
 ### Nuclear Cleanup (Nuke)
 
@@ -443,13 +473,9 @@ nuke  # Run anytime via SSH
 ```
 
 **What Gets Deleted:**
-- User data: `/workspace/ComfyUI/{user,input,output}/*`
-- Temp files: `/tmp/*`, `/workspace/ComfyUI/temp/*`
-- Cache: `/root/.cache/*`, `/root/.bash_history`, `/root/.python_history`
-- Config: `/root/.config/*`, `/root/.local/share/*`
-- Logs: `/workspace/ComfyUI/logs/*`
-- Custom node data: `*/cache*`, `*/history*`, `*.db` files
-- **Models**: `/workspace/ComfyUI/models/*` (all downloaded models)
+- User data, temp files, cache, config, logs
+- Custom node data and caches
+- **All downloaded models** in `/workspace/ComfyUI/models/*`
 
 **Safety:** Nuke only runs automatically if ComfyUI successfully started. Failed startups preserve data for debugging.
 
@@ -458,16 +484,20 @@ nuke  # Run anytime via SSH
 Ignition includes targeted optimizations for RTX 5090 and modern GPUs:
 
 **Startup Performance:**
-- Disabled ComfyUI-Manager network calls at boot (5min → instant)
-- Removed web extension loading overhead
+- Manager network mode offline (instant load vs 5-min delay)
+- Performance plugins pre-installed (no runtime installation delay)
 - Non-blocking initialization
 
 **Inference Performance:**
-- PyTorch nightly with CUDA 12.8 support
-- SAGE Attention available as optional addon (2-5x faster when enabled)
-- Customizable via `COMFY_FLAGS` environment variable
+- **PyTorch nightly with CUDA 12.8** (RTX 5090 Blackwell support)
+- **SAGE Attention** available (15-30% speedup when enabled)
+- **Customizable** via `COMFY_FLAGS` environment variable
 
-**See "🎯 Optional Enhancements" above for additional performance plugins.**
+**Generation Times (RTX 5090):**
+- FLUX.1-dev: ~70s/image
+- FLUX.1-schnell: ~7s/image
+- Qwen-Image: ~71s baseline, ~34s with 8-step Lightning
+- With SageAttention: ~15-30% faster
 
 ## 📟 SSH Command Reference
 
@@ -492,9 +522,6 @@ curl http://localhost:8188/
 # View startup logs
 tail -f /tmp/ignition_startup.log
 
-# Check what's being blocked
-cat /etc/hosts | grep -A 1 "Ignition"
-
 # List downloaded models
 ls -lh /workspace/ComfyUI/models/checkpoints/
 ls -lh /workspace/ComfyUI/models/diffusion_models/
@@ -502,8 +529,11 @@ ls -lh /workspace/ComfyUI/models/diffusion_models/
 # Optional: Download SDXL VAE
 /workspace/scripts/optional/download-sdxl-vae.sh
 
-# Optional: Install performance plugins
+# Optional: Install additional performance plugins (if env vars set)
 /workspace/scripts/optional/install-performance-plugins.sh
+
+# Optional: Manually install SageAttention (usually not needed)
+/workspace/scripts/optional/install-sageattention.sh
 ```
 
 ## 🐛 Troubleshooting
@@ -523,6 +553,12 @@ ls -lh /workspace/ComfyUI/models/diffusion_models/
 - Check that models downloaded successfully
 - Review startup logs for specific errors
 
+### SageAttention Issues
+- Check Python version compatibility
+- Verify CUDA version matches (12.8 for RTX 5090)
+- Try stable v1.0.6 instead of experimental versions
+- Monitor logs during installation
+
 ### Startup Process
 1. 🔍 System requirements check
 2. 🔒 Privacy blocklist setup
@@ -534,10 +570,19 @@ ls -lh /workspace/ComfyUI/models/diffusion_models/
 ## 🏗️ Development
 
 ### Building Locally
+
+**Basic build:**
 ```bash
-git clone https://github.com/your_username/ignition.git
+git clone https://github.com/HeapsGo0d/ignition.git
 cd ignition
 docker build -t ignition-comfyui:dev .
+```
+
+**Build with SageAttention3 wheel:**
+```bash
+docker build \
+  --build-arg SAGEATTENTION_WHEEL_URL=https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl \
+  -t ignition-comfyui:sa3 .
 ```
 
 ### Testing Downloads
