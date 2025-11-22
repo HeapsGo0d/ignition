@@ -73,7 +73,7 @@ lock_plugins
 
 # Copy to repo for deterministic builds
 if [ -f "$COMFY/plugins.lock" ]; then
-  cp "$COMFY/plugins.lock" ./plugins.lock
+  cp "$COMFY/plugins.lock" ./plugins.lock 2>/dev/null || true
   echo "✅ Plugin versions locked in plugins.lock"
 fi
 
