@@ -101,8 +101,8 @@ RUN chmod +x /workspace/scripts/*.sh /workspace/scripts/privacy/*.sh && \
 COPY scripts/nuke /usr/local/bin/nuke
 RUN chmod +x /usr/local/bin/nuke
 
-# Auto-install curated performance plugins and optimize Manager config
-RUN /workspace/scripts/optional/install-performance-plugins.sh
+# Note: Performance plugins are installed at runtime via startup.sh
+# This ensures reliable installation with proper volume context
 
 # Set environment defaults (simplified approach)
 ENV CIVITAI_MODELS=""

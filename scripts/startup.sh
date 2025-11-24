@@ -432,6 +432,17 @@ main() {
     toggle_manager_ui
     remove_manager_web_extensions
 
+    # Install performance plugins on first run
+    if [[ ! -f "$COMFYUI_ROOT/plugins.lock" ]]; then
+        log "INFO" "🔧 Installing performance plugins (first run)..."
+        if /workspace/scripts/optional/install-performance-plugins.sh; then
+            log "INFO" "✅ Performance plugins installed"
+        else
+            log "WARN" "⚠️  Performance plugin installation had issues, continuing"
+        fi
+        log "INFO" ""
+    fi
+
     log "INFO" "🚀 All services started successfully"
     log "INFO" "💡 ComfyUI: http://0.0.0.0:$COMFYUI_PORT"
     log "INFO" "📁 File Browser: http://0.0.0.0:$FILEBROWSER_PORT"
