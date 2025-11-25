@@ -10,7 +10,33 @@ SAGEATTENTION_VERSION="${SAGEATTENTION_VERSION:-1.0.6}"
 echo "🚀 Installing SAGE Attention..."
 echo "   Version: ${SAGEATTENTION_VERSION}"
 
-# Try to install sageattention
+# SA3 requires custom wheel from GitHub releases
+if [[ "${SAGEATTENTION_VERSION}" == "3.0.0" ]] || [[ "${SAGEATTENTION_VERSION}" == 3.* ]]; then
+    SA3_WHEEL_URL="${SAGEATTENTION3_WHEEL_URL:-https://github.com/HeapsGo0d/ignition/releases/download/v3.6.0-sageattention3/sageattn3-1.0.0-cp313-cp313-linux_x86_64.whl}"
+
+    echo "   Detected SA3 request - downloading custom wheel..."
+    echo "   Wheel: ${SA3_WHEEL_URL}"
+
+    if pip install "${SA3_WHEEL_URL}" 2>&1 | tee /tmp/sageattention-install.log; then
+        echo "✅ SAGE Attention 3 installed successfully"
+
+        # Verify import works
+        if python3 -c "import sageattention" 2>/dev/null; then
+            echo "✅ SAGE Attention import verification passed"
+            exit 0
+        else
+            echo "⚠️  SAGE Attention installed but import failed"
+            exit 1
+        fi
+    else
+        echo "❌ Failed to install SAGE Attention 3 from wheel"
+        echo "   Falling back to v1.0.6..."
+        SAGEATTENTION_VERSION="1.0.6"
+        # Continue to normal installation below
+    fi
+fi
+
+# Normal PyPI installation for v1.0.6 and other versions
 if pip install "sageattention==${SAGEATTENTION_VERSION}" 2>&1 | tee /tmp/sageattention-install.log; then
     echo "✅ SAGE Attention ${SAGEATTENTION_VERSION} installed successfully"
 
