@@ -37,12 +37,12 @@ if [[ "${SAGEATTENTION_VERSION}" == "3.0.0" ]] || [[ "${SAGEATTENTION_VERSION}" 
         if pip install "${SA3_WHEEL_URL}" 2>&1 | tee /tmp/sageattention-install.log; then
             echo "✅ SAGE Attention 3 installed successfully"
 
-            # Verify import works
-            if python3 -c "import sageattention" 2>/dev/null; then
-                echo "✅ SAGE Attention import verification passed"
+            # Verify import works (SA3 uses 'sageattn3' module name)
+            if python3 -c "import sageattn3" 2>/dev/null; then
+                echo "✅ SAGE Attention 3 import verification passed"
                 exit 0
             else
-                echo "⚠️  SAGE Attention installed but import failed"
+                echo "⚠️  SAGE Attention 3 installed but import failed"
                 exit 1
             fi
         else
