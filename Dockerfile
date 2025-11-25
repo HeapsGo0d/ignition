@@ -30,11 +30,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install packaging setuptools wheel
 
-# Use PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
-# Based on Hearmeman's proven approach: https://github.com/Hearmeman24/comfyui-sdxl
+# Remove base image PyTorch to ensure clean nightly installation
+RUN pip uninstall -y torch torchvision torchaudio
+
+# Install PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --pre --upgrade --upgrade-strategy eager \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+    pip install --pre --force-reinstall --no-deps \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128 && \
+    pip install --no-deps torchsde
+
+# Verify nightly installation succeeded (build fails if not)
+RUN python3 -c "import torch; v=torch.__version__; print(f'✅ PyTorch: {v} CUDA: {torch.version.cuda}'); assert 'dev' in v, f'Expected nightly, got: {v}'"
 
 # Runtime libraries (triton comes with PyTorch nightly)
 RUN --mount=type=cache,target=/root/.cache/pip \
