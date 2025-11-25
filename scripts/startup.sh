@@ -306,15 +306,24 @@ start_comfyui() {
 
     # Conditionally enable SAGE Attention if requested and available
     if [[ "${ENABLE_SAGEATTENTION:-false}" == "true" ]]; then
-        # Check for both SA1/SA2 (sageattention) and SA3 (sageattn3)
-        if python3 -c "import sageattention" 2>/dev/null || python3 -c "import sageattn3" 2>/dev/null; then
+        # Check which SAGE Attention version is available
+        if python3 -c "import sageattention" 2>/dev/null; then
+            # SA1/SA2 requires --use-sage-attention flag
             COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
-            log "INFO" "  • SAGE Attention enabled"
+            log "INFO" "  • SAGE Attention v1/v2 enabled"
+        elif python3 -c "import sageattn3" 2>/dev/null; then
+            # SA3 auto-patches ComfyUI, doesn't use the flag
+            log "INFO" "  • SAGE Attention v3 enabled (auto-patch mode)"
         else
             log "INFO" "  • SAGE Attention requested, installing automatically..."
             if /workspace/scripts/optional/install-sageattention.sh; then
-                COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
-                log "INFO" "  • SAGE Attention installed and enabled"
+                # After installation, check which version was installed
+                if python3 -c "import sageattention" 2>/dev/null; then
+                    COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
+                    log "INFO" "  • SAGE Attention v1/v2 installed and enabled"
+                elif python3 -c "import sageattn3" 2>/dev/null; then
+                    log "INFO" "  • SAGE Attention v3 installed and enabled (auto-patch mode)"
+                fi
             else
                 log "WARN" "  • SAGE Attention installation failed, continuing without it"
             fi

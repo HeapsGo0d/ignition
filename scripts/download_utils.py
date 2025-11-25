@@ -47,7 +47,7 @@ def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = 
     # Check if file already exists (caching)
     if file_path.exists() and not force:
         file_size_mb = file_path.stat().st_size // (1024 * 1024)
-        if file_size_mb >= 10:  # Valid cached file (at least 10MB)
+        if file_size_mb >= 1:  # Valid cached file (at least 1MB)
             log('info', f'✓ Cached: {filename} ({file_size_mb}MB)')
             return True
 
@@ -82,7 +82,7 @@ def download_with_aria2(url: str, output_dir: Path, filename: str, token: str = 
         result = subprocess.run(cmd, check=False, capture_output=False)
 
         # Check if file was downloaded
-        if file_path.exists() and file_path.stat().st_size > 10 * 1024 * 1024:  # At least 10MB (better corruption detection)
+        if file_path.exists() and file_path.stat().st_size > 1 * 1024 * 1024:  # At least 1MB (better corruption detection)
             log('success', f'Downloaded {filename} ({file_path.stat().st_size // (1024*1024)}MB)')
             return True
         else:
