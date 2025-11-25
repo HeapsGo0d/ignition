@@ -34,10 +34,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN pip uninstall -y torch torchvision torchaudio
 
 # Install PyTorch nightly with CUDA 12.8 for RTX 5090 Blackwell support
+# Let pip install required CUDA dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --pre --force-reinstall --no-deps \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128 && \
-    pip install --no-deps torchsde
+    pip install --pre --force-reinstall \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
 # Verify nightly installation succeeded (build fails if not)
 RUN python3 -c "import torch; v=torch.__version__; print(f'✅ PyTorch: {v} CUDA: {torch.version.cuda}'); assert 'dev' in v, f'Expected nightly, got: {v}'"
