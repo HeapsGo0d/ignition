@@ -40,6 +40,24 @@ if [[ "${SAGEATTENTION_VERSION}" == "3.0.0" ]] || [[ "${SAGEATTENTION_VERSION}" 
             # Verify import works (SA3 uses 'sageattn3' module name)
             if python3 -c "import sageattn3" 2>/dev/null; then
                 echo "✅ SAGE Attention 3 import verification passed"
+
+                # Install ComfyUI-SageAttention3 custom node (required for SA3 integration)
+                CUSTOM_NODE_DIR="/workspace/ComfyUI/custom_nodes/ComfyUI-SageAttention3"
+                if [ ! -d "$CUSTOM_NODE_DIR" ]; then
+                    echo "   Installing ComfyUI-SageAttention3 custom node..."
+                    if git clone --depth 1 https://github.com/wallen0322/ComfyUI-SageAttention3.git "$CUSTOM_NODE_DIR" 2>/dev/null; then
+                        # Install custom node dependencies if requirements.txt exists
+                        if [ -f "$CUSTOM_NODE_DIR/requirements.txt" ]; then
+                            pip install -r "$CUSTOM_NODE_DIR/requirements.txt" 2>&1 | grep -v "^Requirement already satisfied" || true
+                        fi
+                        echo "✅ ComfyUI-SageAttention3 custom node installed"
+                    else
+                        echo "⚠️  Failed to install ComfyUI-SageAttention3 custom node"
+                    fi
+                else
+                    echo "✅ ComfyUI-SageAttention3 custom node already installed"
+                fi
+
                 exit 0
             else
                 echo "⚠️  SAGE Attention 3 installed but import failed"
