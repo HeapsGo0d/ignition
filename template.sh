@@ -247,13 +247,6 @@ get_configuration() {
     VOLUME_GB=${tmp_vol:-$VOLUME_GB}
     echo ""
 
-    # Persistent storage setting
-    echo -e "${BLUE}Persistent Storage:${NC}"
-    echo "  • 'none' = Ephemeral (no persistent storage)"
-    echo "  • Path = Persistent (e.g., /workspace/models)"
-    read -p "Storage mode [none]: " input_storage
-    PERSISTENT_STORAGE=${input_storage:-none}
-    echo ""
 }
 
 # Generate template JSON (manual upload option; schema differs from API)
@@ -320,24 +313,9 @@ generate_template() {
       "description": "HuggingFace API token (optional, for private repos)"
     },
     {
-      "key": "PERSISTENT_STORAGE",
-      "value": "$PERSISTENT_STORAGE",
-      "description": "Persistent storage path or 'none'"
-    },
-    {
       "key": "FILEBROWSER_PASSWORD",
       "value": "$FILEBROWSER_PASSWORD",
       "description": "Password for file browser access"
-    },
-    {
-      "key": "COMFYUI_PORT",
-      "value": "8188",
-      "description": "ComfyUI web interface port"
-    },
-    {
-      "key": "FILEBROWSER_PORT",
-      "value": "8080",
-      "description": "File browser port"
     },
     {
       "key": "ENABLE_SAGEATTENTION",

@@ -101,9 +101,6 @@ docker run -d \
 | `ENABLE_SAGEATTENTION` | Enable SAGE Attention optimization | `"false"` | `"true"` or `"false"` |
 | `SAGEATTENTION_VERSION` | SAGE Attention version to install | `"1.0.6"` | `"1.0.6"`, `"3.0.0"` |
 | `FILEBROWSER_PASSWORD` | File browser password | `"runpod"` | `"secure_password"` |
-| `COMFYUI_PORT` | ComfyUI web interface port | `"8188"` | `"8188"` |
-| `FILEBROWSER_PORT` | File browser port | `"8080"` | `"8080"` |
-| `PERSISTENT_STORAGE` | Persistent storage path | `"none"` | `"/workspace/models"` |
 | `COMFY_FLAGS` | ComfyUI startup flags | `"--preview-method auto"` | `"--lowvram"` |
 
 ## 🔍 Finding Model IDs
@@ -235,6 +232,7 @@ docker build \
 **Important Notes:**
 - Version 1.0.6 (default) has prebuilt wheels for fast installation
 - Version 3.0.0 (SA3) requires custom build or prebuilt wheel
+- **Warning:** SageAttention 3 is an aggressive optimization that may produce significantly different images compared to standard attention or SageAttention 1/2, even with the same seed and workflow.
 - Not all models benefit equally - test with your specific workflows
 - Best results with FLUX and SDXL models
 
@@ -378,24 +376,6 @@ ENABLE_MANAGER_UI=false
 - UI disabled: ~1-2s load time
 - Network mode offline: No 5-min startup delay (in both cases)
 
-## 💾 Storage Options
-
-### Ephemeral (Default)
-```bash
-PERSISTENT_STORAGE="none"
-```
-- Models download fresh each container start
-- Fastest startup for one-time use
-- No storage requirements
-
-### Persistent Storage
-```bash
-PERSISTENT_STORAGE="/workspace/models"
-```
-- Models persist between container restarts
-- Faster subsequent startups
-- Requires network volume or persistent disk
-
 ## 🔧 Advanced Configuration
 
 ### Private Models
@@ -403,13 +383,6 @@ PERSISTENT_STORAGE="/workspace/models"
 # Use API tokens for private/premium models
 CIVITAI_TOKEN="your_private_token"
 HF_TOKEN="hf_your_private_token"
-```
-
-### Custom Ports
-```bash
-# Change default ports if needed
-COMFYUI_PORT="3000"
-FILEBROWSER_PORT="3001"
 ```
 
 ### Performance Tuning

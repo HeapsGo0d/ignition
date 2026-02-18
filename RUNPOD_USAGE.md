@@ -87,14 +87,15 @@ Ignition includes supervisor architecture for safe restarts:
 | Hard Stop | ❌ Deleted | Exits | ✅ Yes |
 | Crash | ✅ Preserved | Running | ❌ No |
 
-## 🎛️ Manager UI Toggle
+## 🎛️ Manager UI & Performance
 
-Control ComfyUI-Manager UI at runtime:
+ComfyUI-Manager UI is **enabled by default** for better usability:
 
-- `ENABLE_MANAGER_UI=false` (default): Instant loads (~1-2s)
-- `ENABLE_MANAGER_UI=true`: Manager UI available (+2-3s load time)
+- Manager UI visible in ComfyUI
+- Network mode set to offline (fast boot, no 5-min delay)
+- Curated performance plugins pre-installed
 
-**To toggle**: Update env var in RunPod, then run soft restart
+**To disable**: Set `ENABLE_MANAGER_UI=false` env var, then run soft restart
 
 ## Troubleshooting
 

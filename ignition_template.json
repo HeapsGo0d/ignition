@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v3.5.8-qwen-final",
+  "name": "Ignition ComfyUI v3.7.8",
   "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.5.8-qwen-final",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.7.8",
   "ports": [
     {
       "privatePort": 8188,
@@ -45,7 +45,7 @@
     },
     {
       "key": "HUGGINGFACE_MODELS", 
-      "value": "qwen_image_edit_fp8,qwen_text_encoder_fp8,qwen_vae",
+      "value": "qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step",
       "description": "Comma-separated HuggingFace repository names"
     },
     {
@@ -59,29 +59,9 @@
       "description": "HuggingFace API token (optional, for private repos)"
     },
     {
-      "key": "PERSISTENT_STORAGE",
-      "value": "",
-      "description": "Persistent storage path or 'none'"
-    },
-    {
       "key": "FILEBROWSER_PASSWORD",
       "value": "runpod",
       "description": "Password for file browser access"
-    },
-    {
-      "key": "COMFYUI_PORT",
-      "value": "8188",
-      "description": "ComfyUI web interface port"
-    },
-    {
-      "key": "FILEBROWSER_PORT",
-      "value": "8080",
-      "description": "File browser port"
-    },
-    {
-      "key": "ENABLE_MANAGER_UI",
-      "value": "false",
-      "description": "Enable ComfyUI-Manager UI (false = instant loads, true = +2-3s load time)"
     },
     {
       "key": "ENABLE_SAGEATTENTION",
@@ -91,7 +71,7 @@
     {
       "key": "SAGEATTENTION_VERSION",
       "value": "1.0.6",
-      "description": "SAGE Attention version to install (default: 1.0.6 with prebuilt wheels)"
+      "description": "SAGE Attention version to install (1.0.6 or 3.0.0 for SA3)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
