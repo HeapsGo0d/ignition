@@ -357,8 +357,7 @@ start_comfyui() {
         fi
 
         # Wait for process exit (but don't let SIGTERM reach us during wait)
-        wait $COMFYUI_PID || true
-        EXIT_CODE=$?
+        wait $COMFYUI_PID && EXIT_CODE=$? || EXIT_CODE=$?
 
         # Check for hard stop marker
         if [[ -f /tmp/comfyui.stop ]]; then
@@ -375,7 +374,11 @@ start_comfyui() {
 }
 
 # Signal handlers
+CLEANUP_DONE=false
+
 cleanup() {
+    [[ "$CLEANUP_DONE" == "true" ]] && return
+    CLEANUP_DONE=true
     log "INFO" "🛑 Shutting down Ignition..."
 
     # Kill connection monitor if running

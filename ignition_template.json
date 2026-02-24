@@ -1,7 +1,7 @@
 {
-  "name": "Ignition ComfyUI v3.7.8",
+  "name": "Ignition ComfyUI v3.7.9",
   "description": "Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support",
-  "dockerImage": "heapsgo0d/ignition-comfyui:v3.7.8",
+  "dockerImage": "heapsgo0d/ignition-comfyui:v3.7.9",
   "ports": [
     {
       "privatePort": 8188,
@@ -45,7 +45,7 @@
     },
     {
       "key": "HUGGINGFACE_MODELS", 
-      "value": "qwen_image_fp8,qwen_text_encoder_fp8,qwen_vae,qwen_lightning_8step",
+      "value": "flux1-dev,clip_l,t5xxl_fp16,ae",
       "description": "Comma-separated HuggingFace repository names"
     },
     {
