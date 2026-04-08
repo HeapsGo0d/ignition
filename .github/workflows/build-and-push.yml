@@ -71,6 +71,7 @@ jobs:
       
     - name: Clean up old Docker images
       if: success()
+      continue-on-error: true
       run: |
         # Install jq for JSON parsing
         sudo apt-get update && sudo apt-get install -y jq
