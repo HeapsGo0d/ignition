@@ -68,7 +68,7 @@ export ENABLE_MANAGER_UI="${ENABLE_MANAGER_UI:-true}"
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║         🚀 IGNITION v2.0.0                ║"
+    log "INFO" "║         🚀 IGNITION v4.0.0                ║"
     log "INFO" "║        ComfyUI Dynamic Model Loader      ║"
     log "INFO" "║      CUDA 13.0.3 / PyTorch cu130         ║"
     log "INFO" "╚═══════════════════════════════════════════╝"

@@ -152,9 +152,9 @@ python3 /workspace/scripts/download_civitai_simple.py --models "123456"
 8. Performance plugins (first run only)
 9. ComfyUI (port 8188) under supervisor loop
 
-## CUDA 13 upgrade (v2.0.0)
+## CUDA 13 upgrade (v4.0.0)
 
-v2.0.0 moves from `pytorch/pytorch:2.5.1-cuda12.4` + nightly cu128 to:
+v4.0.0 moves from `pytorch/pytorch:2.5.1-cuda12.4` + nightly cu128 to:
 
 - **Base image**: `nvidia/cuda:13.0.3-cudnn-runtime-ubuntu24.04`
 - **PyTorch**: nightly cu130
