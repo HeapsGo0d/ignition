@@ -56,7 +56,6 @@ log() {
 export CIVITAI_MODELS="${CIVITAI_MODELS:-}"
 export CIVITAI_LORAS="${CIVITAI_LORAS:-}"
 export CIVITAI_VAES="${CIVITAI_VAES:-}"
-export CIVITAI_FLUX="${CIVITAI_FLUX:-}"
 export HUGGINGFACE_MODELS="${HUGGINGFACE_MODELS:-}"
 export CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 export HF_TOKEN="${HF_TOKEN:-}"
@@ -69,9 +68,9 @@ export ENABLE_MANAGER_UI="${ENABLE_MANAGER_UI:-true}"
 print_banner() {
     log "INFO" ""
     log "INFO" "╔═══════════════════════════════════════════╗"
-    log "INFO" "║         🚀 IGNITION v1.9.2-privacy-lite  ║"
+    log "INFO" "║         🚀 IGNITION v2.0.0                ║"
     log "INFO" "║        ComfyUI Dynamic Model Loader      ║"
-    log "INFO" "║             SIMPLE EDITION               ║"
+    log "INFO" "║      CUDA 13.0.3 / PyTorch cu130         ║"
     log "INFO" "╚═══════════════════════════════════════════╝"
     log "INFO" ""
 }
@@ -81,7 +80,6 @@ print_config() {
     log "INFO" "  • CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
     log "INFO" "  • CivitAI LoRAs: ${CIVITAI_LORAS:-'None specified'}"
     log "INFO" "  • CivitAI VAEs: ${CIVITAI_VAES:-'None specified'}"
-    log "INFO" "  • CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     log "INFO" "  • HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     log "INFO" "  • Storage: RunPod volume (/workspace)"
     log "INFO" "  • ComfyUI Port: $COMFYUI_PORT"
@@ -117,9 +115,9 @@ check_system() {
 setup_storage() {
     log "INFO" "💾 Setting up model directories..."
     
-    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models,diffusion_models,text_encoders,clip,unet}
-    
-    for model_type in checkpoints loras vae embeddings controlnet upscale_models diffusion_models text_encoders clip unet; do
+    mkdir -p "$COMFYUI_ROOT/models"/{checkpoints,loras,vae,embeddings,controlnet,upscale_models,diffusion_models,text_encoders,clip,clip_vision,unet}
+
+    for model_type in checkpoints loras vae embeddings controlnet upscale_models diffusion_models text_encoders clip clip_vision unet; do
         log "INFO" "  • Created $model_type directory"
     done
     
@@ -129,7 +127,7 @@ setup_storage() {
 
 # Use the download_models_once.sh script for downloads
 download_models() {
-    if [[ -z "$CIVITAI_MODELS$CIVITAI_LORAS$CIVITAI_VAES$CIVITAI_FLUX$HUGGINGFACE_MODELS" ]]; then
+    if [[ -z "$CIVITAI_MODELS$CIVITAI_LORAS$CIVITAI_VAES$HUGGINGFACE_MODELS" ]]; then
         log "INFO" "📥 No models requested; skipping downloads."
         log "INFO" ""
         return
@@ -228,7 +226,9 @@ PY
 disable_manager_network() {
     log "INFO" "🔧 Disabling ComfyUI-Manager network mode..."
 
-    local MANAGER_DIR="$COMFYUI_ROOT/user/default/ComfyUI-Manager"
+    # Write only to new 0.18+ path; do NOT create legacy dir or Manager will
+    # detect both dirs and run migration on every boot
+    local MANAGER_DIR="$COMFYUI_ROOT/user/__manager"
     mkdir -p "$MANAGER_DIR"
 
     cat > "$MANAGER_DIR/config.ini" << 'EOF'
@@ -301,34 +301,8 @@ start_comfyui() {
     # Remove stale stop marker
     rm -f /tmp/comfyui.stop
 
-    # ---- ignition flags (env-tunable) ----
-    : "${COMFY_FLAGS:=--preview-method auto}"
-
-    # Conditionally enable SAGE Attention if requested and available
-    if [[ "${ENABLE_SAGEATTENTION:-false}" == "true" ]]; then
-        # Check which SAGE Attention version is available
-        if python3 -c "import sageattention" 2>/dev/null; then
-            # SA1/SA2 requires --use-sage-attention flag
-            COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
-            log "INFO" "  • SAGE Attention v1/v2 enabled"
-        elif python3 -c "import sageattn3" 2>/dev/null; then
-            # SA3 auto-patches ComfyUI, doesn't use the flag
-            log "INFO" "  • SAGE Attention v3 enabled (auto-patch mode)"
-        else
-            log "INFO" "  • SAGE Attention requested, installing automatically..."
-            if /workspace/scripts/optional/install-sageattention.sh; then
-                # After installation, check which version was installed
-                if python3 -c "import sageattention" 2>/dev/null; then
-                    COMFY_FLAGS="${COMFY_FLAGS} --use-sage-attention"
-                    log "INFO" "  • SAGE Attention v1/v2 installed and enabled"
-                elif python3 -c "import sageattn3" 2>/dev/null; then
-                    log "INFO" "  • SAGE Attention v3 installed and enabled (auto-patch mode)"
-                fi
-            else
-                log "WARN" "  • SAGE Attention installation failed, continuing without it"
-            fi
-        fi
-    fi
+    # --enable-cors-header required for RunPod reverse proxy access
+    : "${COMFY_FLAGS:=--preview-method auto --enable-cors-header}"
 
     log "INFO" "  • Startup flags: ${COMFY_FLAGS}"
 
@@ -341,7 +315,8 @@ start_comfyui() {
 
         # Wait for first successful start
         if [[ "$COMFYUI_STARTED" != "true" ]]; then
-            for i in {1..30}; do
+            # 120s budget: Manager prestartup (~6s) + device init (~5s) + custom node imports (~30s) + server bind
+            for i in {1..120}; do
                 if curl -sf http://127.0.0.1:$COMFYUI_PORT/ >/dev/null 2>&1; then
                     COMFYUI_STARTED=true
                     log "INFO" "✅ ComfyUI responding on port $COMFYUI_PORT"
@@ -351,7 +326,7 @@ start_comfyui() {
             done
 
             if [[ "$COMFYUI_STARTED" != "true" ]]; then
-                log "ERROR" "❌ ComfyUI failed to start within 30 seconds"
+                log "ERROR" "❌ ComfyUI failed to start within 120 seconds"
                 exit 5
             fi
         fi

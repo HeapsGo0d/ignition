@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # Configuration
 DOCKER_IMAGE="heapsgo0d/ignition-comfyui:latest"
 TEMPLATE_NAME="Ignition ComfyUI Latest"
-TEMPLATE_DESCRIPTION="Dynamic ComfyUI with safe restart architecture and runtime Manager UI toggle - Simple, elegant, functional with RTX 5090 support"
+TEMPLATE_DESCRIPTION="Dynamic ComfyUI for image generation — FLUX and Qwen models, CUDA 13.0.3, PyTorch nightly cu130, RTX 5090 / Blackwell ready"
 
 # Disk defaults (can be overridden interactively or via env)
 CONTAINER_DISK_GB="${CONTAINER_DISK_GB:-200}"
@@ -145,12 +145,6 @@ get_configuration() {
     CIVITAI_VAES=${input_vaes:-"1674314"}
     echo ""
     
-    # CivitAI FLUX with default
-    echo -e "${BLUE}CivitAI FLUX Models:${NC}"
-    read -p "CivitAI FLUX model IDs [153568]: " input_flux
-    CIVITAI_FLUX=${input_flux:-"153568"}
-    echo ""
-    
     # Image Generation Model Preset Selection
     echo -e "${BLUE}Image Generation Model:${NC}"
     echo "  1) FLUX.1-dev (default - best quality, ~70s/gen)"
@@ -190,38 +184,6 @@ get_configuration() {
         *)
             HUGGINGFACE_MODELS="flux1-dev,clip_l,t5xxl_fp16,ae"
             echo "  → Invalid selection, defaulting to FLUX.1-dev"
-            ;;
-    esac
-    echo ""
-
-    # SageAttention Configuration
-    echo -e "${BLUE}SageAttention Optimization:${NC}"
-    echo "  1) Disabled (default - no performance boost)"
-    echo "  2) Enabled with v1.0.6 (stable, ~15-20% speedup)"
-    echo "  3) Enabled with SA3 (experimental, ~25-30% speedup - requires custom build)"
-    read -p "Select SageAttention option [1]: " sa_preset
-
-    case ${sa_preset:-1} in
-        1)
-            ENABLE_SAGEATTENTION="false"
-            SAGEATTENTION_VERSION="1.0.6"
-            echo "  → SageAttention disabled"
-            ;;
-        2)
-            ENABLE_SAGEATTENTION="true"
-            SAGEATTENTION_VERSION="1.0.6"
-            echo "  → SageAttention v1.0.6 enabled (auto-install at runtime)"
-            ;;
-        3)
-            ENABLE_SAGEATTENTION="true"
-            SAGEATTENTION_VERSION="3.0.0"
-            echo "  → SageAttention3 enabled (requires SA3 wheel in build)"
-            echo "  → Build command: docker build --build-arg SAGEATTENTION_WHEEL_URL=<wheel-url>"
-            ;;
-        *)
-            ENABLE_SAGEATTENTION="false"
-            SAGEATTENTION_VERSION="1.0.6"
-            echo "  → Invalid selection, defaulting to disabled"
             ;;
     esac
     echo ""
@@ -293,12 +255,7 @@ generate_template() {
       "description": "Comma-separated CivitAI VAE model version IDs"
     },
     {
-      "key": "CIVITAI_FLUX",
-      "value": "$CIVITAI_FLUX",
-      "description": "Comma-separated CivitAI FLUX model version IDs"
-    },
-    {
-      "key": "HUGGINGFACE_MODELS", 
+      "key": "HUGGINGFACE_MODELS",
       "value": "$HUGGINGFACE_MODELS",
       "description": "Comma-separated HuggingFace repository names"
     },
@@ -316,16 +273,6 @@ generate_template() {
       "key": "FILEBROWSER_PASSWORD",
       "value": "$FILEBROWSER_PASSWORD",
       "description": "Password for file browser access"
-    },
-    {
-      "key": "ENABLE_SAGEATTENTION",
-      "value": "$ENABLE_SAGEATTENTION",
-      "description": "Enable SAGE Attention optimization (false = disabled, true = auto-install and enable)"
-    },
-    {
-      "key": "SAGEATTENTION_VERSION",
-      "value": "$SAGEATTENTION_VERSION",
-      "description": "SAGE Attention version to install (1.0.6 or 3.0.0 for SA3)"
     }
   ],
   "startScript": "bash /workspace/scripts/startup.sh"
@@ -355,7 +302,6 @@ print_summary() {
     echo "  CivitAI Models: ${CIVITAI_MODELS:-'None specified'}"
     echo "  CivitAI LoRAs: ${CIVITAI_LORAS:-'None specified'}"
     echo "  CivitAI VAEs: ${CIVITAI_VAES:-'None specified'}"
-    echo "  CivitAI FLUX: ${CIVITAI_FLUX:-'None specified'}"
     echo "  HuggingFace Models: ${HUGGINGFACE_MODELS:-'None specified'}"
     echo ""
     echo -e "${BLUE}Access:${NC}"
@@ -510,18 +456,15 @@ deploy_template() {
   "volumeMountPath": "/workspace",
   "dockerArgs": "",
   "ports": "8188/http,8080/http",
-  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- CivitAI Models: $CIVITAI_MODELS\\n- CivitAI LoRAs: $CIVITAI_LORAS\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
+  "readme": "# $TEMPLATE_NAME\\n\\n$TEMPLATE_DESCRIPTION\\n\\n## Configuration\\n- HuggingFace Models: $HUGGINGFACE_MODELS\\n- CivitAI Models: $CIVITAI_MODELS\\n- CivitAI LoRAs: $CIVITAI_LORAS\\n- Storage: ${STORAGE_NOTE} (${CONTAINER_DISK_GB}GB container disk, ${VOLUME_GB}GB volume)",
   "env": [
     {"key": "CIVITAI_MODELS", "value": "$CIVITAI_MODELS"},
     {"key": "CIVITAI_LORAS", "value": "$CIVITAI_LORAS"},
     {"key": "CIVITAI_VAES", "value": "$CIVITAI_VAES"},
-    {"key": "CIVITAI_FLUX", "value": "$CIVITAI_FLUX"},
     {"key": "HUGGINGFACE_MODELS", "value": "$HUGGINGFACE_MODELS"},
     {"key": "CIVITAI_TOKEN", "value": "{{ RUNPOD_SECRET_civitai.com }}"},
     {"key": "HF_TOKEN", "value": "{{ RUNPOD_SECRET_huggingface.co }}"},
-    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"},
-    {"key": "ENABLE_SAGEATTENTION", "value": "$ENABLE_SAGEATTENTION"},
-    {"key": "SAGEATTENTION_VERSION", "value": "$SAGEATTENTION_VERSION"}
+    {"key": "FILEBROWSER_PASSWORD", "value": "$FILEBROWSER_PASSWORD"}
   ]
 }
 EOF
